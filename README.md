@@ -1,4 +1,8 @@
+---
 
+# 🔗 在线预览 / Live Demo
+
+👉 https://476106017.github.io/gamesDevelopedByAIsHelp/
 
 # gamesDevelopedByAIsHelp （AI辅助游戏合集）项目介绍    ————ByAIsHelp
 
@@ -6,6 +10,12 @@
 其中最具やりこみ要素的核心作品是《仓库管理员模拟器》，其次是强化了道具系统的《扫雷》。
 我们的目标是：打造独一无二的精品小游戏，吸引热爱游戏的人，体验 AI 辅助开发的无限可能与乐趣。
 ---
+
+## 📌 （PR）求職中 / Job Seeking
+
+現在、東京在住で**AI支援開発 / Java / Vue / ゲーム開発 / 物流システム**に関心があるポジションを探しています。  
+個人でも複数のミニゲームや業務系システムを開発しており、UI/UXにもこだわりを持っています。  
+ご連絡は **zdm476106017@qq.com** までお願いいたします。
 
 ## 🌐 语言 / Languages / 言語
 
@@ -72,12 +82,6 @@ src/
 - [x] Vite 构建工具
 - [x] Vue Router + Vue I18n
 - [x] GitHub Pages 自动部署
-
----
-
-## 🔗 在线预览 / Live Demo
-
-👉 https://476106017.github.io/gamesDevelopedByAIsHelp/
 
 ---
 
