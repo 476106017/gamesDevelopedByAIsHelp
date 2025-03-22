@@ -1,0 +1,22 @@
+用户点击下单按钮
+↓
+placeOrder(productId)
+↓
+countInZoneFree(...) → 返回空格子数（格子数 = 最大可进货箱数）
+↓
+requestImport(productId, boxCount, 可用格数)
+↓
+- 检查商品是否存在
+- 检查资金是否足够
+- 检查空间是否足够
+  ↓
+  ✅ 若成功 → 写入 gameState.incomingShipments 队列
+  ↓
+  每一帧 → updateShipments(...)
+  ↓
+  若当前时间 ≥ ETA
+  → 调用 placeGoodsInZone(...) 将货物放入入库区
+  ↓
+  画面显示新货格子（drawGrid → 通过 itemGrid 显示）
+  ↓
+  👷 工人可以点击去搬运

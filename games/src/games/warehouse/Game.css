@@ -1,0 +1,229 @@
+
+.warehouse-canvas-game {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+canvas {
+    border: 2px solid #ccc;
+    background-color: #fff;
+}
+.sidebar {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 300px;
+    background: #f4f4f4;
+    border-left: 2px solid #ccc;
+    display: flex;
+    flex-direction: column;
+    /* 保证固定高度 */
+    height: 100vh;
+    padding: 10px;
+    font-size: 14px;
+}
+
+.sidebar-content {
+    overflow-y: auto;
+    flex: 1;
+    padding: 12px;
+}
+button.price-btn {
+    width: 64px; /* 原来可能是 48px 或自适应 */
+    height: 28px;
+    font-size: 14px;
+    margin-left: 20px;
+    border-radius: 6px;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    cursor: pointer;
+}
+
+.product-line {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.emoji-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+}
+
+.emoji {
+    font-size: 28px;
+}
+.count-overlay {
+    position: absolute;
+    bottom: -4px;
+    right: -6px;
+    font-size: 10px;           /* ↓ 缩小字体 */
+    color: #000;
+    background: #fff;
+    padding: 0px 3px;          /* ↓ 缩小内边距 */
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    pointer-events: none;
+    line-height: 1.2;
+}
+
+
+.stock-line {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.name {
+    width: 60px;
+    margin-left: 6px;
+}
+
+.value {
+    margin-left: auto;
+    font-weight: bold;
+}
+
+.note {
+    font-size: 12px;
+    color: #555;
+    margin: 0 4px;
+}
+.tabs {
+    display: flex;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+.tabs button {
+    flex: 1;
+    padding: 6px;
+    background: #ddd;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+}
+.tabs button.active {
+    background: #bbb;
+    color: white;
+}
+.stock-line .emoji {
+    font-size: 20px;
+    margin-right: 6px;
+}
+.stock-line .name {
+    width: 60px;
+}
+.stock-line .qty {
+    margin-left: auto;
+    font-weight: bold;
+}
+.money-display {
+    top: 10px;
+    left: 10px;
+    font-weight: bold;
+    font-size: 18px;
+    background: rgba(255,255,255,0.9);
+    padding: 10px;
+    margin-top:10px;
+    border-radius: 6px;
+    box-shadow: 0 0 4px rgba(0,0,0,0.2);
+    z-index: 10;
+}
+.order-card {
+    padding: 10px;
+    margin-bottom: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.order-item {
+    display: flex;
+    justify-content: space-between;
+    margin: 4px 0;
+    font-size: 14px;
+}
+
+.order-bonus, .order-total {
+    font-size: 13px;
+    margin: 10px;
+    color: #333;
+}
+
+.progress-bar {
+    height: 6px;
+    background: #ddd;
+    margin-top: 8px;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #5dd;
+    transition: width 0.5s;
+}
+
+.complete-btn {
+    float: right;
+    margin-top: -50px;
+    height: 40px;
+    font-size: 13px;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.complete-btn:hover {
+    background-color: #43a047;
+}
+
+.tab-level {
+    padding: 10px;
+}
+
+.level-bar {
+    height: 12px;
+    background: #eee;
+    border-radius: 6px;
+    margin-top: 6px;
+    overflow: hidden;
+}
+
+.level-bar-inner {
+    height: 100%;
+    background: #4caf50;
+    transition: width 0.3s;
+}
+
+.locked {
+    color: #999;
+    opacity: 0.7;
+    padding-top: 12px;
+    padding-left: 32px;
+    font-style: italic;
+    user-select: none;
+    cursor: not-allowed;
+}
+
+.inventory-total {
+    text-align: right;
+    margin-top: 12px;
+    padding: 6px 10px;
+    background-color: #f7f7f7;
+    border-top: 1px solid #ccc;
+    font-weight: bold;
+    color: #222;
+    font-size: 15px;
+}
