@@ -210,7 +210,7 @@ function getOrderRevenue(order) {
 }
 
 function getProgress(order) {
-  const totalTime = 60000 // 所有订单固定持续 1 分钟
+  const totalTime = 180000 // 所有订单固定持续 3 分钟
   const remaining = order.expires - Date.now()
   const percent = Math.min(100, Math.max(0, ((totalTime - remaining) / totalTime) * 100))
   return 100 - percent
@@ -290,28 +290,28 @@ function placeOrder(productId) {
 }
 
 function centerOnWorker() {
-  // 画布最多显示的格数
-  // 你之前计算过 visibleCols / visibleRows
   const halfCols = visibleCols / 2
   const halfRows = visibleRows / 2
 
-  // 工人网格坐标
   const gx = worker.value.gx
   const gy = worker.value.gy
 
-  // 以工人居中
-  let newX = gx - halfCols
-  let newY = gy - halfRows
+  // 目标视角
+  let targetX = gx - halfCols
+  let targetY = gy - halfRows
 
   // 边界处理
-  if (newX < 0) newX = 0
-  if (newX > cols - visibleCols) newX = cols - visibleCols
-  if (newY < 0) newY = 0
-  if (newY > rows - visibleRows) newY = rows - visibleRows
+  if (targetX < 0) targetX = 0
+  if (targetX > cols - visibleCols) targetX = cols - visibleCols
+  if (targetY < 0) targetY = 0
+  if (targetY > rows - visibleRows) targetY = rows - visibleRows
 
-  // 更新视角
-  view.value.x = newX
-  view.value.y = newY
+  // 使用线性插值（lerp）实现平滑过渡
+  const lerp = (a, b, t) => a + (b - a) * t
+  const t = 0.1 // 平滑程度（越小越慢）
+
+  view.value.x = lerp(view.value.x, targetX, t)
+  view.value.y = lerp(view.value.y, targetY, t)
 }
 
 function drawWorker() {

@@ -2,17 +2,17 @@
   <div class="minesweeper-container">
     <div v-if="!level" class="overlay">
       <div class="popup">
-        <h3>難易度を選択</h3>
-        <button @click="selectLevel('easy')">初級</button>
-        <button @click="selectLevel('medium')">中級</button>
-        <button @click="selectLevel('hard')">上級</button>
+        <h3>{{ $t('selectDifficulty') }}</h3>
+        <button @click="selectLevel('easy')">{{ $t('easy') }}</button>
+        <button @click="selectLevel('medium')">{{ $t('medium') }}</button>
+        <button @click="selectLevel('hard')">{{ $t('hard') }}</button>
       </div>
     </div>
 
-    <h2>マインスイーパー</h2>
+    <h2>{{ $t('title') }}</h2>
     <div class="status-bar">
-      <span>経過時間：{{ time }}秒</span>
-      <span>残り旗：{{ flagsLeft }}</span>
+      <span>{{ $t('time') }}：{{ time }}{{ $t('seconds') }}</span>
+      <span>{{ $t('flagsLeft') }}：{{ flagsLeft }}</span>
     </div>
     <div class="grid">
       <div v-for="(row, y) in board" :key="y" class="row">
@@ -39,24 +39,26 @@
               class="item-icon fading"
           >{{ getItemIcon(cell.item) }}
           </span>
-          <span v-else>&nbsp;</span> <!-- 保底空格 -->
+          <span v-else>&nbsp;</span>
         </div>
       </div>
     </div>
+
     <div v-if="items.length" class="toolbar">
       <span v-for="(item, i) in items" :key="i" class="tool" @click="useItem(i)">
-        {{ getItemIcon(item) }} {{ getItemName(item) }}
+        {{ getItemIcon(item) }} {{ $t('tool_' + item) }}
       </span>
     </div>
-    <p v-if="gameOver">💥 ゲームオーバー！</p>
-    <p v-else-if="gameWon">🎉 クリア！</p>
-    <button v-if="gameOver || gameWon" @click="restart">再プレイ</button>
+
+    <p v-if="gameOver">{{ $t('gameOver') }}</p>
+    <p v-else-if="gameWon">{{ $t('cleared') }}</p>
+    <button v-if="gameOver || gameWon" @click="restart">{{ $t('retry') }}</button>
   </div>
 </template>
 
+
 <script setup>
 import { ref, onUnmounted } from 'vue'
-import { playBeep } from '@/utils/useSound'
 
 const levelMap = {
   easy: { width: 9, height: 9, mines: 10 },
@@ -104,7 +106,6 @@ function selectLevel(lv) {
         item: null, // 可能是 'flag' , 'reveal', 'robot' 等
       }))
   )
-  console.log('生成地图完成:', board.value)
 }
 
 
@@ -141,7 +142,6 @@ function generateBoard(excludeX, excludeY) {
       }
     }
   }
-  console.log('生成地图完成:', b.length, b[0]?.length)
 
   return b
 }
@@ -185,7 +185,6 @@ function handleRightClick(x, y) {
   const cell = board.value[y][x]
   cell.flagged = !cell.flagged
   flagsLeft.value += cell.flagged ? -1 : 1
-  playBeep(660, 80, 0.1)
 }
 
 function reveal(x, y) {
@@ -196,7 +195,6 @@ function reveal(x, y) {
 
   if (cell.mine) {
     gameOver.value = true
-    playBeep(120, 400, 0.1)
     stopTimer()
     revealAll()
     return
@@ -270,7 +268,6 @@ function dangerColor(count) {
 }
 
 function tryClickSafeCell() {
-  console.log('机器人尝试点击')
   for (let y = 0; y < height.value; y++) {
     for (let x = 0; x < width.value; x++) {
       const cell = board.value[y][x]
@@ -296,13 +293,11 @@ function tryClickSafeCell() {
         if (flagCount + unrevealed.length === cell.count && unrevealed.length > 0) {
           const { x: tx, y: ty } = unrevealed[Math.floor(Math.random() * unrevealed.length)]
           handleRightClick(tx, ty)
-          console.log('机器人尝试成功')
           return true
         }
       }
     }
   }
-  console.log('机器人尝试失败')
   return false
 }
 
@@ -356,15 +351,6 @@ function getItemIcon(key) {
     case 'reveal': return '🌟'
     case 'robot': return '🤖'
     default: return '❓'
-  }
-}
-
-function getItemName(key) {
-  switch (key) {
-    case 'flag': return '地雷自動マーク'
-    case 'reveal': return '安全エリア展開'
-    case 'robot': return 'ロボット補助'
-    default: return '不明'
   }
 }
 

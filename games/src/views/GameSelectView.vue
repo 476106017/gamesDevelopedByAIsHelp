@@ -1,6 +1,6 @@
 <template>
   <div class="game-select">
-    <h1>ミニゲーム一覧</h1>
+    <h1>{{ $t('gameList') }}</h1>
     <div class="game-list">
       <div
           v-for="game in games"
@@ -8,8 +8,8 @@
           class="game-item"
           @click="goToGame(game.name)"
       >
-        <img :src="game.thumbnail" :alt="game.title" />
-        <p>{{ game.title }}</p>
+        <img :src="game.thumbnail" :alt="$t('games.' + game.name)" />
+        <p>{{ $t('games.' + game.name) }}</p>
       </div>
     </div>
   </div>

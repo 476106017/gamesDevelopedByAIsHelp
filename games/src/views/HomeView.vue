@@ -1,7 +1,7 @@
 <template>
   <div class="home">
-    <h1>ミニゲームセンターへようこそ！</h1>
-    <button @click="goToGames">ゲームを選ぶ</button>
+    <h1>{{ $t('homeTitle') }}</h1>
+    <button @click="goToGames">{{ $t('chooseGame') }}</button>
   </div>
 </template>
 
