@@ -42,7 +42,9 @@ export function generateOrder() {
     }
 }
 
-export function tryCompleteOrder(order, itemGrid, terrainGrid) {
+export function tryCompleteOrder(order, itemGrid, terrainGrid, unlockedSkills = []) {
+    const hasBananaSkill = unlockedSkills.includes('auto-banana')
+
     // 累计每种商品在出库区的数量
     const zoneItems = {}
 
@@ -60,13 +62,22 @@ export function tryCompleteOrder(order, itemGrid, terrainGrid) {
 
     // 检查是否满足订单需求
     for (const item of order.items) {
-        if (!zoneItems[item.productId] || zoneItems[item.productId] < item.count) {
-            return { success: false, reason: '库存不足' }
+        const isBanana = item.productId === 'banana'
+        const available = zoneItems[item.productId] || 0
+
+        if (!isBanana || !hasBananaSkill) {
+            if (available < item.count) {
+                return { success: false, reason: '库存不足' }
+            }
         }
+        // 如果是香蕉且有豁免技能，就跳过检查
     }
 
-    // ✅ 扣减出库区中的货物
+    // ✅ 扣减出库区中的货物（香蕉豁免则不扣）
     for (const item of order.items) {
+        const isBanana = item.productId === 'banana'
+        if (isBanana && hasBananaSkill) continue
+
         let remain = item.count
         for (let y = 0; y < itemGrid.length; y++) {
             for (let x = 0; x < itemGrid[0].length; x++) {

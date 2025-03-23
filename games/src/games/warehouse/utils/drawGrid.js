@@ -37,6 +37,30 @@ export function drawGrid(ctx, terrainGrid, itemGrid, view, tileSize, rows, cols,
                     ctx.fillRect(screenX + tileSize - 28, screenY + tileSize - 18, 26, 16)
                     ctx.fillStyle = '#000'
                     ctx.fillText(`×${item.count}`, screenX + tileSize - 4, screenY + tileSize - 4)
+// ➕ 绘制增长动画
+                    if (item.growthAnim) {
+                        const elapsed = Date.now() - item.growthAnim.start
+                        const duration = 800 // 动画时长 ms
+
+                        if (elapsed < duration) {
+                            const progress = elapsed / duration
+                            const floatY = 20 * progress // 向上浮动
+                            const alpha = 1 - progress   // 渐隐
+                            const scale = 1 + progress   // 放大一点
+
+                            ctx.save()
+                            ctx.globalAlpha = alpha
+                            ctx.font = `${12 * scale}px sans-serif`
+                            ctx.fillStyle = 'darkgreen' // ← 深绿色
+                            ctx.textAlign = 'right'
+                            ctx.fillText('+1', screenX + tileSize - 4, screenY + 12 - floatY)
+                            ctx.restore()
+                        } else {
+                            delete item.growthAnim // 动画结束后移除
+                        }
+                    }
+
+
                 }
             }
         }

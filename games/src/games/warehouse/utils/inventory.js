@@ -1,5 +1,7 @@
 import { products } from '../data/products.js'
 import { gameState } from '../data/gameState.js'
+import { OUT_ZONE } from './initGrid'
+
 
 export function requestImport(productId, boxCount, currentInZoneSpaces) {
     const product = products.find(p => p.id === productId)
@@ -24,20 +26,24 @@ export function requestImport(productId, boxCount, currentInZoneSpaces) {
 
     return { success: true }
 }
-
-export function updateShipments(itemGrid, terrainGrid, zoneType) {
+export function updateShipments(itemGrid, terrainGrid, inZoneType, unlockedSkills = []) {
     const now = Date.now()
     const remaining = []
 
     for (const shipment of gameState.incomingShipments) {
         if (shipment.eta <= now) {
-            const success = placeGoodsInZone(
-                itemGrid,
-                terrainGrid,
-                zoneType,
-                shipment.productId,
-                shipment.boxCount
-            )
+            let success = false
+
+            // ✅ 如果有 direct-out 技能，尝试投放到出库区
+            if (unlockedSkills.includes('direct-out')) {
+                success = placeGoodsInZone(itemGrid, terrainGrid, OUT_ZONE, shipment.productId, shipment.boxCount)
+            }
+
+            // ❌ 如果出库区满或没启用技能，再放入入库区
+            if (!success) {
+                success = placeGoodsInZone(itemGrid, terrainGrid, inZoneType, shipment.productId, shipment.boxCount)
+            }
+
             if (!success) {
                 alert('入库失败，空间不足')
             }
@@ -48,6 +54,7 @@ export function updateShipments(itemGrid, terrainGrid, zoneType) {
 
     gameState.incomingShipments = remaining
 }
+
 export function placeGoodsInZone(itemGrid, terrainGrid, zoneType, productId, quantity) {
     const product = products.find(p => p.id === productId)
     if (!product) return false

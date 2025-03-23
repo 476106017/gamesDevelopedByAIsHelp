@@ -23,13 +23,13 @@
         </button>
       </div>
     <div class="sidebar-content">
-      <div v-if="currentTab === '入库'">
+      <div v-if="currentTab === '入库'" style="padding: 16px">
         <div
             v-for="(p, i) in products"
             :key="p.id"
             class="product-entry"
         >
-          <div v-if="i <= levelState.level + 1">
+          <div v-if="i <= levelState.level + 1"  class="product-line">
             <span class="emoji" :title="getTooltip(p.name)">{{ p.emoji }}</span>
             <span class="name">{{ p.name }}</span>
             <span class="note">{{ p.boxSize }}个/箱</span>
@@ -67,7 +67,7 @@
       </div>
 
 
-      <div v-else-if="currentTab === '库存'">
+      <div v-if="currentTab === '库存'" style="padding: 16px">
         <div v-for="(info, pid) in stockSummary" :key="pid" class="stock-line">
           <div class="emoji-wrapper" :title="getTooltip(info.name)">
             <span class="emoji">{{ info.emoji }}</span>
@@ -81,6 +81,27 @@
         </div>
 
       </div>
+      <div v-if="currentTab === '技能'" class="skill-panel">
+        <div
+            v-for="skill in skillList"
+            :key="skill.id"
+            class="skill-entry"
+            :class="{ unlocked: unlockedSkills.includes(skill.id) }"
+        >
+          <div class="skill-text">
+            <span class="skill-name">{{ skill.name }}</span>
+            <span class="skill-desc">{{ skill.description }}</span>
+          </div>
+          <button
+              :disabled="unlockedSkills.includes(skill.id) || gameState.money < skill.cost"
+              @click="unlockSkill(skill.id)"
+          >
+            {{ unlockedSkills.includes(skill.id) ? '已解锁' : `购买 ¥${skill.cost}` }}
+          </button>
+        </div>
+
+      </div>
+
 
 
     </div>
@@ -143,8 +164,30 @@ let mouseY = 0
 
 const hoverCellInfo = ref(null)
 
-const tabs = ['入库', '出库', '库存']
+const tabs = ['入库', '出库', '库存', '技能']
 const currentTab = ref('入库')
+const skillList = [
+  {
+    id: 'auto-banana',
+    name: '🍌香蕉豁免',
+    description: '完成订单时无视香蕉条件',
+    cost: 500,
+  },
+  {
+    id: 'direct-out',
+    name: '📦入即出',
+    description: '允许商品入库到出库区',
+    cost: 800,
+  },
+  {
+    id: 'shelf-grow',
+    name: '🌱富营养货架',
+    description: '让货架上的商品肆意生长！',
+    cost: 2000,
+  }
+]
+
+const unlockedSkills = ref([])
 
 const animatedMoney = ref(gameState.money)
 
@@ -186,6 +229,14 @@ function gainExp(amount) {
   return Math.max(min, Math.floor(interval))
 }
 
+function unlockSkill(skillId) {
+  const skill = skillList.find(s => s.id === skillId)
+  if (!skill) return
+  if (gameState.money >= skill.cost && !unlockedSkills.value.includes(skillId)) {
+    gameState.money -= skill.cost
+    unlockedSkills.value.push(skillId)
+  }
+}
 
 function getProduct(productId) {
   return products.find(p => p.id === productId) || {}
@@ -238,7 +289,6 @@ setInterval(() => {
   const now = Date.now()
   activeOrders.value = activeOrders.value.filter(order => order.expires > now)
 }, 1000)
-
 const stockSummary = computed(() => {
   const summary = {}
   for (let row of itemGrid.value) {
@@ -247,26 +297,25 @@ const stockSummary = computed(() => {
         const product = products.find(p => p.id === cell.productId)
         if (!product) continue
 
-        const countToAdd = product.boxSize // ← 一格 = 一箱，乘箱大小
+        const count = cell.count
 
         if (!summary[product.id]) {
           summary[product.id] = {
-            count: countToAdd,
+            count,
             emoji: product.emoji,
             name: product.name,
-            value: countToAdd * product.sellPrice, // ← 加这行
-
+            value: count * product.sellPrice,
           }
         } else {
-          summary[product.id].count += countToAdd
-          summary[product.id].value += countToAdd * product.sellPrice
-
+          summary[product.id].count += count
+          summary[product.id].value += count * product.sellPrice
         }
       }
     }
   }
   return summary
 })
+
 
 function getTooltip(name) {
   const p = products.find(p => p.name === name)
@@ -379,6 +428,8 @@ function drawShipmentsProgress() {
   })
 }
 
+let shelfGrowTimer = 0
+
 function animate() {
   ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
   drawGrid(ctx, terrainGrid.value, itemGrid.value, view.value, tileSize, rows, cols, canvasWidth, canvasHeight)
@@ -386,7 +437,17 @@ function animate() {
   centerOnWorker() // 调整视角到工人居中
   drawWorker()
   drawShipmentsProgress()
-  updateShipments(itemGrid.value, terrainGrid.value, IN_ZONE)
+  updateShipments(itemGrid.value, terrainGrid.value, IN_ZONE, unlockedSkills.value)
+
+  // 每 60 帧（约1秒）尝试增长货架商品
+  shelfGrowTimer++
+  if (shelfGrowTimer >= 60) {
+    shelfGrowTimer = 0
+    if (unlockedSkills.value.includes('shelf-grow')) {
+      growShelfItems()
+    }
+  }
+
   animationFrameId = requestAnimationFrame(animate)
   if (worker.value.target) {
     const [gx, gy] = worker.value.target
@@ -497,8 +558,72 @@ function animate() {
       })
     }
   }
-
 }
+
+function growShelfItems() {
+  for (let y = 0; y < itemGrid.value.length; y++) {
+    for (let x = 0; x < itemGrid.value[0].length; x++) {
+      const terrain = terrainGrid.value[y][x]
+      const item = itemGrid.value[y][x]
+
+      if (terrain === SHELF && item && item.type === 'goods') {
+        const product = products.find(p => p.id === item.productId)
+        if (!product) continue
+
+        const max = product.boxSize
+
+        if (Math.random() < item.count * 0.01) {
+          item.count++
+          item.growthAnim = { start: Date.now() }
+
+          if (item.count > max) {
+            // 尝试将多余部分转移到邻近格子
+            const directions = [
+              [1, 0], [-1, 0], [0, 1], [0, -1]
+            ]
+
+            for (const [dx, dy] of directions) {
+              const nx = x + dx
+              const ny = y + dy
+              if (nx < 0 || ny < 0 || nx >= itemGrid.value[0].length || ny >= itemGrid.value.length) continue
+
+              const neighbor = itemGrid.value[ny][nx]
+              const neighborTerrain = terrainGrid.value[ny][nx]
+
+              if (neighborTerrain === SHELF) {
+                if (!neighbor) {
+                  // 空位放新货
+                  itemGrid.value[ny][nx] = {
+                    type: 'goods',
+                    productId: item.productId,
+                    count: 1,
+                    growthAnim: { start: Date.now() }
+                  }
+                  item.count--
+                  break
+                } else if (
+                    neighbor.type === 'goods' &&
+                    neighbor.productId === item.productId &&
+                    neighbor.count < max
+                ) {
+                  // 合并到未满的同类货物
+                  neighbor.count++
+                  neighbor.growthAnim = { start: Date.now() }
+                  item.count--
+                  break
+                }
+              }
+            }
+
+            // 再保险：主格子不能超过上限
+            if (item.count > max) item.count = max
+          }
+        }
+      }
+    }
+  }
+}
+
 
 function afterArrivedTile() {
   const { gx, gy } = worker.value
@@ -566,7 +691,7 @@ function moveWorker() {
 }
 
 function handleComplete(order) {
-  const result = tryCompleteOrder(order, itemGrid.value, terrainGrid.value)
+  const result = tryCompleteOrder(order, itemGrid.value, terrainGrid.value, unlockedSkills.value)
   if (result.success) {
     activeOrders.value = activeOrders.value.filter(o => o.id !== order.id)
     gainExp(result.total) // result.total 是订单收入，可作为经验值
