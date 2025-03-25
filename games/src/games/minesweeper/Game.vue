@@ -441,7 +441,6 @@ onUnmounted(stopTimer)
 .minesweeper-container {
   text-align: center;
   padding: 2rem;
-  min-height: 100vh;
   background-color: #f0f0f0;
   overflow-x: auto;
 }

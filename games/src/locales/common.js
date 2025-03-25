@@ -8,7 +8,8 @@ export default {
             snake: '蛇ゲーム',
             tetris: 'テトリス',
             minesweeper: 'マインスイーパー',
-            warehouse: '倉庫管理人の日常'
+            warehouse: '倉庫管理人の日常',
+            moonlight: '月影',
         }
     },
     en: {
@@ -20,7 +21,8 @@ export default {
             snake: 'Snake Game',
             tetris: 'Tetris',
             minesweeper: 'Minesweeper',
-            warehouse: 'Warehouse Manager\'s Daily Life'
+            warehouse: 'Warehouse Manager\'s Daily Life',
+            moonlight: 'Moonlight',
         }
     },
     zh: {
@@ -32,7 +34,8 @@ export default {
             snake: '贪吃蛇',
             tetris: '俄罗斯方块',
             minesweeper: '扫雷',
-            warehouse: '仓库管理员的日常'
+            warehouse: '仓库管理员的日常',
+            moonlight: '月光',
         }
     }
 }
