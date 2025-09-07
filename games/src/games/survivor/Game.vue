@@ -71,8 +71,8 @@
             <span v-else>散弹枪✓</span>
           </div>
           <div class="node">
-            <button v-if="!bulletSkills.fission" @click="unlockFission" :disabled="skillPoints <= 0 || !bulletSkills.speed">裂变子弹</button>
-            <span v-else>裂变子弹✓</span>
+            <button v-if="!bulletSkills.fission" @click="unlockFission" :disabled="skillPoints <= 0 || !bulletSkills.speed">弹射子弹</button>
+            <span v-else>弹射子弹✓</span>
           </div>
           <div class="node">
             <button v-if="!bulletSkills.bend" @click="unlockBend" :disabled="skillPoints <= 0 || !bulletSkills.vamp">拐弯子弹</button>
@@ -82,8 +82,8 @@
         <div class="row">
           <div class="node"></div>
           <div class="node">
-            <button v-if="!bulletSkills.doubleFission && !bulletSkills.deathBullet" @click="unlockDoubleFission" :disabled="skillPoints <= 0 || !bulletSkills.fission">二次裂变</button>
-            <span v-else-if="bulletSkills.doubleFission">二次裂变✓</span>
+            <button v-if="!bulletSkills.doubleFission && !bulletSkills.deathBullet" @click="unlockDoubleFission" :disabled="skillPoints <= 0 || !bulletSkills.fission">二次弹射</button>
+            <span v-else-if="bulletSkills.doubleFission">二次弹射✓</span>
           </div>
           <div class="node">
             <button v-if="!bulletSkills.deathBullet && !bulletSkills.doubleFission" @click="unlockDeathBullet" :disabled="skillPoints <= 0 || !bulletSkills.fission">死亡子弹</button>
@@ -263,11 +263,12 @@ function spawnEnemy() {
   })
 }
 
-function getNearestEnemy(fromX = player.x, fromY = player.y) {
+function getNearestEnemy(fromX = player.x, fromY = player.y, excludeIndex = -1) {
   let nearest = null
   let minDist = Infinity
   let index = -1
   for (let i = 0; i < enemies.length; i++) {
+    if (i === excludeIndex) continue
     const e = enemies[i]
     const d = Math.hypot(e.x - fromX, e.y - fromY)
     if (d < minDist) {
@@ -596,7 +597,7 @@ function update() {
           if (depth < maxDepth) {
             const originX = e.x
             const originY = e.y
-            const { enemy: next } = getNearestEnemy(originX, originY)
+            const { enemy: next } = getNearestEnemy(originX, originY, i)
             if (next) {
               const dx2 = next.x - originX
               const dy2 = next.y - originY
