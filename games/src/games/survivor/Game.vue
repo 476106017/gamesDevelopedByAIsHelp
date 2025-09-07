@@ -53,40 +53,40 @@
         </div>
         <div class="row">
           <div class="node">
-            <button v-if="bulletSkills.power && !bulletSkills.fireRate" @click="selectFireRate" :disabled="skillPoints <= 0">射击频率</button>
-            <span v-else-if="bulletSkills.fireRate">射击频率✓</span>
+            <button v-if="!bulletSkills.fireRate" @click="selectFireRate" :disabled="skillPoints <= 0 || !bulletSkills.power">射击频率</button>
+            <span v-else>射击频率✓</span>
           </div>
           <div class="node">
-            <button v-if="bulletSkills.power && !bulletSkills.speed" @click="selectSpeed" :disabled="skillPoints <= 0">子弹速度</button>
-            <span v-else-if="bulletSkills.speed">子弹速度✓</span>
+            <button v-if="!bulletSkills.speed" @click="selectSpeed" :disabled="skillPoints <= 0 || !bulletSkills.power">子弹速度</button>
+            <span v-else>子弹速度✓</span>
           </div>
           <div class="node">
-            <button v-if="bulletSkills.power && !bulletSkills.vamp" @click="unlockVamp" :disabled="skillPoints <= 0">吸血弹</button>
-            <span v-else-if="bulletSkills.vamp">吸血弹✓</span>
+            <button v-if="!bulletSkills.vamp" @click="unlockVamp" :disabled="skillPoints <= 0 || !bulletSkills.power">吸血弹</button>
+            <span v-else>吸血弹✓</span>
           </div>
         </div>
         <div class="row">
           <div class="node">
-            <button v-if="bulletSkills.fireRate && !bulletSkills.shotgun" @click="unlockShotgun" :disabled="skillPoints <= 0">散弹枪</button>
-            <span v-else-if="bulletSkills.shotgun">散弹枪✓</span>
+            <button v-if="!bulletSkills.shotgun" @click="unlockShotgun" :disabled="skillPoints <= 0 || !bulletSkills.fireRate">散弹枪</button>
+            <span v-else>散弹枪✓</span>
           </div>
           <div class="node">
-            <button v-if="bulletSkills.speed && !bulletSkills.fission" @click="unlockFission" :disabled="skillPoints <= 0">裂变子弹</button>
-            <span v-else-if="bulletSkills.fission">裂变子弹✓</span>
+            <button v-if="!bulletSkills.fission" @click="unlockFission" :disabled="skillPoints <= 0 || !bulletSkills.speed">裂变子弹</button>
+            <span v-else>裂变子弹✓</span>
           </div>
           <div class="node">
-            <button v-if="bulletSkills.vamp && !bulletSkills.bend" @click="unlockBend" :disabled="skillPoints <= 0">拐弯子弹</button>
-            <span v-else-if="bulletSkills.bend">拐弯子弹✓</span>
+            <button v-if="!bulletSkills.bend" @click="unlockBend" :disabled="skillPoints <= 0 || !bulletSkills.vamp">拐弯子弹</button>
+            <span v-else>拐弯子弹✓</span>
           </div>
         </div>
         <div class="row">
           <div class="node"></div>
           <div class="node">
-            <button v-if="bulletSkills.fission && !bulletSkills.doubleFission && !bulletSkills.deathBullet" @click="unlockDoubleFission" :disabled="skillPoints <= 0">二次裂变</button>
+            <button v-if="!bulletSkills.doubleFission && !bulletSkills.deathBullet" @click="unlockDoubleFission" :disabled="skillPoints <= 0 || !bulletSkills.fission">二次裂变</button>
             <span v-else-if="bulletSkills.doubleFission">二次裂变✓</span>
           </div>
           <div class="node">
-            <button v-if="bulletSkills.fission && !bulletSkills.doubleFission && !bulletSkills.deathBullet" @click="unlockDeathBullet" :disabled="skillPoints <= 0">死亡子弹</button>
+            <button v-if="!bulletSkills.deathBullet && !bulletSkills.doubleFission" @click="unlockDeathBullet" :disabled="skillPoints <= 0 || !bulletSkills.fission">死亡子弹</button>
             <span v-else-if="bulletSkills.deathBullet">死亡子弹✓</span>
           </div>
           <div class="node"></div>
@@ -298,6 +298,9 @@ function shoot() {
         size: 3,
         damage: Math.max(1, bulletDamage - 1),
         life: 30,
+        depth: 0,
+        death: bulletSkills.deathBullet,
+        fission: bulletSkills.fission,
       })
     }
   } else {
@@ -1013,12 +1016,15 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  z-index: 0;
 }
 
 .tree .row {
   display: flex;
   justify-content: space-around;
   margin-top: 10px;
+  position: relative;
+  z-index: 1;
 }
 
 .tree .row:first-child {
@@ -1032,6 +1038,8 @@ onUnmounted(() => {
   padding: 2px 4px;
   min-width: 60px;
   text-align: center;
+  position: relative;
+  z-index: 1;
 }
 
 .node:empty {
