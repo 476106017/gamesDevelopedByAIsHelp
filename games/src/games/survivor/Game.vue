@@ -9,12 +9,15 @@
 
     <div class="hud">
       <div class="info">
-        🕒 {{ Math.floor(elapsed / 1000) }}s | 👾 {{ score }} | ⭐ {{ level }}
+        🕒 {{ Math.floor(elapsed / 1000) }}s | 👾 {{ score }} | ⭐ {{ level }} | ❤️ {{ hp }}/{{ maxHp }}
       </div>
       <div class="exp-bar">
         <div class="exp-fill" :style="{ width: (exp / expToNext * 100) + '%' }"></div>
       </div>
-      <button @click="restart">重新开始</button>
+      <div class="btn-row">
+        <button @click="showSkillTree = true">技能树({{ skillPoints }})</button>
+        <button @click="restart">重新开始</button>
+      </div>
     </div>
 
     <div class="weapon-levels">
@@ -24,43 +27,41 @@
       💣{{ bombLevel }}
     </div>
 
-    <div v-if="showUpgrade" class="upgrade-overlay">
-      <template v-if="bulletLevel < 3">
-        <button @click="upgradeBullet">
-          {{ bulletLevel === 2 ? '🔫完全形态（击杀再射一发）' : '提升🔫射速' }}
-        </button>
-      </template>
-      <span v-else>🔫Lv.MAX（击杀再射一发）</span>
-
-      <template v-if="!hasKnife">
-        <button @click="unlockKnife">解锁🔪小刀</button>
-      </template>
-      <template v-else-if="knifeLevel < 3">
-        <button @click="upgradeKnife">
-          {{ knifeLevel === 2 ? '🔪完全形态（击杀冻结敌人）' : '提升🔪伤害' }}
-        </button>
-      </template>
-      <span v-else>🔪Lv.MAX（击杀冻结敌人）</span>
-
-      <template v-if="!hasFlame">
-        <button @click="unlockFlame">解锁🔥火焰</button>
-      </template>
-      <template v-else-if="flameLevel < 3">
-        <button @click="upgradeFlame">
-          {{ flameLevel === 2 ? '🔥完全形态（无限穿透并变大）' : '提升🔥穿透' }}
-        </button>
-      </template>
-      <span v-else>🔥Lv.MAX（无限穿透并变大）</span>
-
-      <template v-if="!hasBomb">
-        <button @click="unlockBomb">解锁💣炸弹</button>
-      </template>
-      <template v-else-if="bombLevel < 3">
-        <button @click="upgradeBomb">
-          {{ bombLevel === 2 ? '💣完全形态（吸附最近敌人）' : '提升💣范围' }}
-        </button>
-      </template>
-      <span v-else>💣Lv.MAX（吸附最近敌人）</span>
+    <div v-if="showSkillTree" class="skill-overlay">
+      <div class="tabs">
+        <button @click="currentTree = 'bullet'">🔫</button>
+        <button @click="currentTree = 'knife'">🔪</button>
+        <button @click="currentTree = 'flame'">🔥</button>
+        <button @click="currentTree = 'bomb'">💣</button>
+      </div>
+      <div v-if="currentTree === 'bullet'" class="skill-page">
+        <div v-if="!bulletSkills.fireRate && !bulletSkills.speed">
+          <button @click="selectFireRate" :disabled="skillPoints <= 0">射击频率</button>
+          <button @click="selectSpeed" :disabled="skillPoints <= 0">射击速度</button>
+        </div>
+        <div v-else-if="bulletSkills.fireRate">
+          <div v-if="!bulletSkills.shotgun">
+            <button @click="unlockShotgun" :disabled="skillPoints <= 0">散弹枪</button>
+          </div>
+        </div>
+        <div v-else-if="bulletSkills.speed">
+          <div v-if="!bulletSkills.fission">
+            <button @click="unlockFission" :disabled="skillPoints <= 0">裂变子弹</button>
+          </div>
+          <div v-else>
+            <button v-if="!bulletSkills.doubleFission && !bulletSkills.deathBullet" @click="unlockDoubleFission" :disabled="skillPoints <= 0">二次裂变</button>
+            <button v-if="!bulletSkills.doubleFission && !bulletSkills.deathBullet" @click="unlockDeathBullet" :disabled="skillPoints <= 0">死亡子弹</button>
+          </div>
+        </div>
+        <div class="common-path">
+          <button v-if="!bulletSkills.power" @click="unlockPower" :disabled="skillPoints <= 0">强力子弹</button>
+          <button v-else-if="!bulletSkills.vamp" @click="unlockVamp" :disabled="skillPoints <= 0">吸血子弹</button>
+          <button v-else-if="!bulletSkills.bend" @click="unlockBend" :disabled="skillPoints <= 0">拐弯子弹</button>
+          <span v-else>已全部解锁</span>
+        </div>
+      </div>
+      <div v-else class="skill-page">敬请期待</div>
+      <button @click="showSkillTree = false">关闭</button>
     </div>
 
     <div v-if="gameOver" class="game-over-overlay">
@@ -71,7 +72,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, reactive } from 'vue'
 
 const canvasRef = ref(null)
 const ctx = ref(null)
@@ -80,7 +81,9 @@ const width = ref(window.innerWidth)
 const height = ref(window.innerHeight)
 
 const player = { x: 0, y: 0, size: 10 }
-const bulletDamage = 1
+const hp = ref(3)
+const maxHp = ref(3)
+let bulletDamage = 1
 // 刀的伤害较高，补偿其极短的攻击范围
 let knifeDamage = 10
 let knifeRange = 80
@@ -106,7 +109,7 @@ const elapsed = ref(0)
 
 const exp = ref(0)
 const level = ref(1)
-const bulletSpeed = 4
+let bulletSpeed = 4
 let bulletInterval = 500
 let flamePierce = 1
 let bombRange = 40
@@ -114,7 +117,20 @@ let expToNext = 5
 const hasKnife = ref(false)
 const hasFlame = ref(false)
 const hasBomb = ref(false)
-const showUpgrade = ref(false)
+const showSkillTree = ref(false)
+const skillPoints = ref(0)
+const currentTree = ref('bullet')
+const bulletSkills = reactive({
+  fireRate: false,
+  speed: false,
+  shotgun: false,
+  fission: false,
+  doubleFission: false,
+  deathBullet: false,
+  power: false,
+  vamp: false,
+  bend: false,
+})
 let paused = false
 
 const bulletLevel = ref(1)
@@ -233,7 +249,33 @@ function shoot() {
   const dx = target.x - player.x
   const dy = target.y - player.y
   const len = Math.hypot(dx, dy)
-  bullets.push({ x: player.x, y: player.y, vx: dx / len * bulletSpeed, vy: dy / len * bulletSpeed, size: 4 })
+  const baseAngle = Math.atan2(dy, dx)
+  if (bulletSkills.shotgun) {
+    for (let i = 0; i < 6; i++) {
+      const ang = baseAngle + (Math.random() - 0.5) * 0.6
+      bullets.push({
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(ang) * bulletSpeed * 0.6,
+        vy: Math.sin(ang) * bulletSpeed * 0.6,
+        size: 3,
+        damage: Math.max(1, bulletDamage - 1),
+        life: 30,
+      })
+    }
+  } else {
+    bullets.push({
+      x: player.x,
+      y: player.y,
+      vx: dx / len * bulletSpeed,
+      vy: dy / len * bulletSpeed,
+      size: 4,
+      damage: bulletDamage,
+      depth: 0,
+      death: bulletSkills.deathBullet,
+      fission: bulletSkills.fission,
+    })
+  }
 }
 
 function update() {
@@ -378,11 +420,14 @@ function update() {
         }
         effects.push({ type: 'shield', x: player.x, y: player.y, ttl: 20, r: 40 })
       } else {
-        playerEmoji.value = '😭'
-        paused = true
-        gameOver.value = true
-        showUpgrade.value = false
-        return
+        hp.value--
+        if (hp.value <= 0) {
+          playerEmoji.value = '😭'
+          paused = true
+          gameOver.value = true
+          showSkillTree.value = false
+          return
+        }
       }
     }
   }
@@ -392,6 +437,29 @@ function update() {
     const b = bullets[i]
     b.x += b.vx
     b.y += b.vy
+    if (bulletSkills.bend && !b.homed) {
+      for (const bg of backgrounds) {
+        if (Math.hypot(bg.x - b.x, bg.y - b.y) < 8) {
+          const { enemy: t } = getNearestEnemy(b.x, b.y)
+          if (t) {
+            const dx2 = t.x - b.x
+            const dy2 = t.y - b.y
+            const len2 = Math.hypot(dx2, dy2)
+            b.vx = dx2 / len2 * bulletSpeed
+            b.vy = dy2 / len2 * bulletSpeed
+            b.homed = true
+          }
+          break
+        }
+      }
+    }
+    if (b.life !== undefined) {
+      b.life--
+      if (b.life <= 0) {
+        bullets.splice(i, 1)
+        continue
+      }
+    }
     if (
       b.x < player.x - width.value / 2 - 100 ||
       b.x > player.x + width.value / 2 + 100 ||
@@ -468,23 +536,44 @@ function update() {
     for (let j = bullets.length - 1; j >= 0; j--) {
       const b = bullets[j]
       if (Math.hypot(e.x - b.x, e.y - b.y) < e.size + b.size) {
-        e.hp -= bulletDamage
-        bullets.splice(j, 1)
-        if (e.hp <= 0) {
+        const dmg = b.damage ?? bulletDamage
+        e.hp -= dmg
+        const killed = e.hp <= 0
+        if (killed) {
           const ex = e.x, ey = e.y
           enemies.splice(i, 1)
           score.value++
           xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
-          if (bulletLevel.value >= 3 && enemies.length) {
-            const { enemy: next } = getNearestEnemy(ex, ey)
+        }
+        if (bulletSkills.vamp && killed) {
+          hp.value = Math.min(maxHp.value, hp.value + 1)
+        }
+        if ((b.fission || bulletSkills.fission) && (!b.death || killed)) {
+          const maxDepth = bulletSkills.doubleFission ? 2 : 1
+          const depth = b.depth || 0
+          if (depth < maxDepth) {
+            const originX = e.x
+            const originY = e.y
+            const { enemy: next } = getNearestEnemy(originX, originY)
             if (next) {
-              const dx2 = next.x - ex
-              const dy2 = next.y - ey
+              const dx2 = next.x - originX
+              const dy2 = next.y - originY
               const len2 = Math.hypot(dx2, dy2)
-              bullets.push({ x: ex, y: ey, vx: dx2 / len2 * bulletSpeed, vy: dy2 / len2 * bulletSpeed, size: 4 })
+              bullets.push({
+                x: originX,
+                y: originY,
+                vx: dx2 / len2 * bulletSpeed,
+                vy: dy2 / len2 * bulletSpeed,
+                size: 4,
+                damage: bulletDamage,
+                depth: depth + 1,
+                death: b.death,
+                fission: true,
+              })
             }
           }
         }
+        bullets.splice(j, 1)
         break
       }
     }
@@ -655,12 +744,17 @@ function restart() {
   knifeRange = 80
   flamePierce = 1
   bombRange = 40
+  bulletSpeed = 4
+  bulletDamage = 1
   playerShield = false
   knifeInterval = 200
   lastPowerup = Date.now()
   hasKnife.value = false
   hasFlame.value = false
   hasBomb.value = false
+  hp.value = maxHp.value
+  skillPoints.value = 0
+  Object.keys(bulletSkills).forEach(k => bulletSkills[k] = false)
   bulletLevel.value = 1
   knifeLevel.value = 0
   flameLevel.value = 0
@@ -675,7 +769,6 @@ function restart() {
   knife.y = player.y
   startTime.value = Date.now()
   keys.clear()
-  showUpgrade.value = false
   playerEmoji.value = levelEmojis[0]
   gameOver.value = false
   paused = false
@@ -686,68 +779,85 @@ function levelUp() {
   level.value++
   expToNext = Math.floor(expToNext * 1.5)
   playerEmoji.value = levelEmojis[Math.min(level.value - 1, levelEmojis.length - 1)]
-  const upgradesAvailable =
-    bulletLevel.value < 3 ||
-    !hasKnife.value || knifeLevel.value < 3 ||
-    !hasFlame.value || flameLevel.value < 3 ||
-    !hasBomb.value || bombLevel.value < 3
-  if (upgradesAvailable) {
-    paused = true
-    showUpgrade.value = true
-  }
+  skillPoints.value++
 }
 
 function unlockKnife() {
   hasKnife.value = true
   knifeLevel.value = 1
-  showUpgrade.value = false
-  paused = false
 }
 
 function unlockFlame() {
   hasFlame.value = true
   flameLevel.value = 1
-  showUpgrade.value = false
-  paused = false
 }
 
 function unlockBomb() {
   hasBomb.value = true
   bombLevel.value = 1
-  showUpgrade.value = false
-  paused = false
 }
 
-function upgradeBullet() {
-  if (bulletLevel.value >= 3) return
-  bulletInterval = Math.max(100, bulletInterval - 50)
-  bulletLevel.value++
-  showUpgrade.value = false
-  paused = false
+function spendPoint(fn) {
+  if (skillPoints.value <= 0) return
+  skillPoints.value--
+  fn()
 }
 
-function upgradeKnife() {
-  if (knifeLevel.value >= 3) return
-  knifeDamage += 5
-  knifeLevel.value++
-  showUpgrade.value = false
-  paused = false
+function selectFireRate() {
+  spendPoint(() => {
+    bulletSkills.fireRate = true
+    bulletInterval = Math.max(100, bulletInterval - 100)
+  })
 }
 
-function upgradeFlame() {
-  if (flameLevel.value >= 3) return
-  flamePierce++
-  flameLevel.value++
-  showUpgrade.value = false
-  paused = false
+function selectSpeed() {
+  spendPoint(() => {
+    bulletSkills.speed = true
+    bulletSpeed += 2
+  })
 }
 
-function upgradeBomb() {
-  if (bombLevel.value >= 3) return
-  bombRange += 20
-  bombLevel.value++
-  showUpgrade.value = false
-  paused = false
+function unlockShotgun() {
+  spendPoint(() => {
+    bulletSkills.shotgun = true
+  })
+}
+
+function unlockFission() {
+  spendPoint(() => {
+    bulletSkills.fission = true
+  })
+}
+
+function unlockDoubleFission() {
+  spendPoint(() => {
+    bulletSkills.doubleFission = true
+  })
+}
+
+function unlockDeathBullet() {
+  spendPoint(() => {
+    bulletSkills.deathBullet = true
+  })
+}
+
+function unlockPower() {
+  spendPoint(() => {
+    bulletSkills.power = true
+    bulletDamage += 1
+  })
+}
+
+function unlockVamp() {
+  spendPoint(() => {
+    bulletSkills.vamp = true
+  })
+}
+
+function unlockBend() {
+  spendPoint(() => {
+    bulletSkills.bend = true
+  })
 }
 
 onMounted(() => {
@@ -815,7 +925,12 @@ onUnmounted(() => {
   background: #4caf50;
 }
 
-.upgrade-overlay {
+.btn-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.skill-overlay {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -826,6 +941,19 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.5rem;
   align-items: center;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.skill-page {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .weapon-levels {
