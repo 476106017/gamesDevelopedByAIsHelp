@@ -107,16 +107,16 @@ function spawnEnemy() {
   const hp = 1 + stage
   const speed = 0.5 + stage * 0.2
   const emoji = enemyEmojis[Math.min(stage, enemyEmojis.length - 1)]
-  enemies.push({ x, y, size: 10, hp, maxHp: hp, speed, emoji })
+  enemies.push({ x, y, size: 10, hp, maxHp: hp, speed, emoji, freeze: 0 })
 }
 
-function getNearestEnemy() {
+function getNearestEnemy(fromX = player.x, fromY = player.y) {
   let nearest = null
   let minDist = Infinity
   let index = -1
   for (let i = 0; i < enemies.length; i++) {
     const e = enemies[i]
-    const d = Math.hypot(e.x - player.x, e.y - player.y)
+    const d = Math.hypot(e.x - fromX, e.y - fromY)
     if (d < minDist) {
       minDist = d
       nearest = e
@@ -154,7 +154,7 @@ function update() {
 
   if (now - lastShoot > bulletInterval) { shoot(); lastShoot = now }
 
-  if (hasKnife.value && now - lastKnife > 800) {
+  if (hasKnife.value && now - lastKnife > 500) {
     const { enemy: nearest, dist: minDist, index: nearestIndex } = getNearestEnemy()
     if (nearest) {
       const nx = (nearest.x - player.x) / minDist
@@ -168,6 +168,12 @@ function update() {
           enemies.splice(nearestIndex, 1)
           score.value++
           xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
+          if (knifeLevel.value >= 3) {
+            enemies.forEach(e => {
+              if (Math.hypot(e.x - ex, e.y - ey) < 100) e.freeze = 120
+            })
+            effects.push({ type: 'freeze', x: ex, y: ey, ttl: 30, r: 50 })
+          }
         }
       }
       effects.push({ type: 'slash', x: sx, y: sy, ttl: 10 })
@@ -181,7 +187,7 @@ function update() {
       const dx = target.x - player.x
       const dy = target.y - player.y
       const len = Math.hypot(dx, dy)
-      flames.push({ x: player.x, y: player.y, vx: dx / len * 3, vy: dy / len * 3, life: 60, size: 6, pierce: flamePierce })
+      flames.push({ x: player.x, y: player.y, vx: dx / len * 3, vy: dy / len * 3, life: 60, size: 6, pierce: flameLevel.value >= 3 ? Infinity : flamePierce })
     }
     lastFlame = now
   }
@@ -198,6 +204,7 @@ function update() {
   }
 
   enemies.forEach(e => {
+    if (e.freeze > 0) { e.freeze--; return }
     const dx = player.x - e.x
     const dy = player.y - e.y
     const len = Math.hypot(dx, dy)
@@ -247,8 +254,12 @@ function update() {
           score.value++
           xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
         }
-        f.pierce--
-        if (f.pierce <= 0) { flames.splice(i, 1); removed = true; break }
+        if (flameLevel.value < 3) {
+          f.pierce--
+          if (f.pierce <= 0) { flames.splice(i, 1); removed = true; break }
+        } else {
+          f.size += 2
+        }
       }
     }
     if (!removed && f.life <= 0) flames.splice(i, 1)
@@ -261,6 +272,18 @@ function update() {
     m.y += m.vy
     m.vx *= 0.98
     m.vy *= 0.98
+    if (bombLevel.value >= 3) {
+      const { enemy: target } = getNearestEnemy(m.x, m.y)
+      if (target) {
+        const dx = m.x - target.x
+        const dy = m.y - target.y
+        const dist = Math.hypot(dx, dy)
+        if (dist > 1) {
+          target.x += dx / dist * 0.5
+          target.y += dy / dist * 0.5
+        }
+      }
+    }
     if (Math.hypot(m.vx, m.vy) < 0.3) {
       for (let j = enemies.length - 1; j >= 0; j--) {
         const e = enemies[j]
@@ -289,6 +312,15 @@ function update() {
           enemies.splice(i, 1)
           score.value++
           xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
+          if (bulletLevel.value >= 3 && enemies.length) {
+            const { enemy: next } = getNearestEnemy(ex, ey)
+            if (next) {
+              const dx2 = next.x - ex
+              const dy2 = next.y - ey
+              const len2 = Math.hypot(dx2, dy2)
+              bullets.push({ x: ex, y: ey, vx: dx2 / len2 * bulletSpeed, vy: dy2 / len2 * bulletSpeed, size: 4 })
+            }
+          }
         }
         break
       }
@@ -357,7 +389,10 @@ function draw() {
 
   // 火焰
   flames.forEach(f => {
+    ctx.value.save()
+    ctx.value.font = f.size * 2 + 'px sans-serif'
     ctx.value.fillText('🔥', f.x - camX, f.y - camY)
+    ctx.value.restore()
   })
 
   // 炸弹
@@ -372,6 +407,13 @@ function draw() {
     const sy = ef.y - camY
     if (ef.type === 'slash') {
       ctx.value.fillText('🔪', sx, sy)
+    } else if (ef.type === 'freeze') {
+      ctx.value.save()
+      ctx.value.font = ef.r * 2 + 'px sans-serif'
+      ctx.value.textAlign = 'center'
+      ctx.value.textBaseline = 'middle'
+      ctx.value.fillText('❄️', sx, sy)
+      ctx.value.restore()
     } else {
       ctx.value.save()
       ctx.value.font = ef.r * 2 + 'px sans-serif'
@@ -482,7 +524,7 @@ function upgradeFlame() {
 }
 
 function upgradeBomb() {
-  bombRange += 10
+  bombRange += 20
   bombLevel.value++
   showUpgrade.value = false
   paused = false
