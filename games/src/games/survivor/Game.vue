@@ -11,16 +11,17 @@
       <div class="info">
         🕒 {{ Math.floor(elapsed / 1000) }}s | 👾 {{ score }} | ⭐ {{ level }}
       </div>
-      <div class="weapons">
-        🔫
-        <span v-if="hasKnife">🔪</span>
-        <span v-if="hasFlame">🔥</span>
-        <span v-if="hasBomb">💣</span>
-      </div>
       <div class="exp-bar">
         <div class="exp-fill" :style="{ width: (exp / expToNext * 100) + '%' }"></div>
       </div>
       <button @click="restart">重新开始</button>
+    </div>
+
+    <div class="weapon-levels">
+      🔫{{ bulletLevel }}
+      🔪{{ knifeLevel }}
+      🔥{{ flameLevel }}
+      💣{{ bombLevel }}
     </div>
 
     <div v-if="showUpgrade" class="upgrade-overlay">
@@ -81,6 +82,15 @@ const hasBomb = ref(false)
 const showUpgrade = ref(false)
 let paused = false
 
+const bulletLevel = ref(1)
+const knifeLevel = ref(0)
+const flameLevel = ref(0)
+const bombLevel = ref(0)
+
+const levelEmojis = ['🙂','😊','😄','😁','😆','😎']
+const playerEmoji = ref(levelEmojis[0])
+const gameOver = ref(false)
+
 const enemyEmojis = ['👾', '👹', '👻', '🤖', '👺']
 
 function spawnEnemy() {
@@ -132,11 +142,11 @@ function update() {
 
   if (paused) { draw(); return }
 
-  // 玩家移动
-  if (keys.has('ArrowUp')) player.y -= 3
-  if (keys.has('ArrowDown')) player.y += 3
-  if (keys.has('ArrowLeft')) player.x -= 3
-  if (keys.has('ArrowRight')) player.x += 3
+  // 玩家移动，支持方向键与 WASD
+  if (keys.has('arrowup') || keys.has('w')) player.y -= 3
+  if (keys.has('arrowdown') || keys.has('s')) player.y += 3
+  if (keys.has('arrowleft') || keys.has('a')) player.x -= 3
+  if (keys.has('arrowright') || keys.has('d')) player.x += 3
 
   // 根据存活时间调整刷怪速度，减缓提升节奏
   const spawnInterval = Math.max(400, 1000 - Math.floor(elapsed.value / 80))
@@ -198,8 +208,10 @@ function update() {
   // 敌人碰撞玩家
   for (const e of enemies) {
     if (Math.hypot(e.x - player.x, e.y - player.y) < e.size + player.size) {
-      alert('游戏结束！')
-      restart()
+      playerEmoji.value = '😭'
+      paused = true
+      gameOver.value = true
+      showUpgrade.value = false
       return
     }
   }
@@ -319,7 +331,7 @@ function draw() {
   ctx.value.textBaseline = 'middle'
 
   // 玩家
-  ctx.value.fillText('🙂', player.x - camX, player.y - camY)
+  ctx.value.fillText(playerEmoji.value, player.x - camX, player.y - camY)
 
   // 敌人及血条
   enemies.forEach(e => {
@@ -374,11 +386,11 @@ function draw() {
 }
 
 function handleKeyDown(e) {
-  keys.add(e.key)
+  keys.add(e.key.toLowerCase())
 }
 
 function handleKeyUp(e) {
-  keys.delete(e.key)
+  keys.delete(e.key.toLowerCase())
 }
 
 function restart() {
@@ -400,6 +412,10 @@ function restart() {
   hasKnife.value = false
   hasFlame.value = false
   hasBomb.value = false
+  bulletLevel.value = 1
+  knifeLevel.value = 0
+  flameLevel.value = 0
+  bombLevel.value = 0
   lastShoot = 0
   lastKnife = 0
   lastFlame = 0
@@ -409,6 +425,8 @@ function restart() {
   startTime.value = Date.now()
   keys.clear()
   showUpgrade.value = false
+  playerEmoji.value = levelEmojis[0]
+  gameOver.value = false
   paused = false
 }
 
@@ -416,48 +434,56 @@ function levelUp() {
   exp.value -= expToNext
   level.value++
   expToNext = Math.floor(expToNext * 1.5)
+  playerEmoji.value = levelEmojis[Math.min(level.value - 1, levelEmojis.length - 1)]
   paused = true
   showUpgrade.value = true
 }
 
 function unlockKnife() {
   hasKnife.value = true
+  knifeLevel.value = 1
   showUpgrade.value = false
   paused = false
 }
 
 function unlockFlame() {
   hasFlame.value = true
+  flameLevel.value = 1
   showUpgrade.value = false
   paused = false
 }
 
 function unlockBomb() {
   hasBomb.value = true
+  bombLevel.value = 1
   showUpgrade.value = false
   paused = false
 }
 
 function upgradeBullet() {
   bulletInterval = Math.max(100, bulletInterval - 50)
+  bulletLevel.value++
   showUpgrade.value = false
   paused = false
 }
 
 function upgradeKnife() {
   knifeDamage += 5
+  knifeLevel.value++
   showUpgrade.value = false
   paused = false
 }
 
 function upgradeFlame() {
   flamePierce++
+  flameLevel.value++
   showUpgrade.value = false
   paused = false
 }
 
 function upgradeBomb() {
   bombRange += 10
+  bombLevel.value++
   showUpgrade.value = false
   paused = false
 }
@@ -516,10 +542,6 @@ onUnmounted(() => {
   gap: 0.5rem;
 }
 
-.weapons {
-  font-size: 1.2rem;
-}
-
 .exp-bar {
   width: 200px;
   height: 10px;
@@ -542,6 +564,17 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.5rem;
   align-items: center;
+}
+
+.weapon-levels {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  color: #000;
 }
 </style>
 
