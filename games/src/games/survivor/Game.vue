@@ -27,7 +27,7 @@
     <div v-if="showUpgrade" class="upgrade-overlay">
       <template v-if="bulletLevel < 3">
         <button @click="upgradeBullet">
-          提升🔫射速{{ bulletLevel === 2 ? '（击杀再射一发）' : '' }}
+          {{ bulletLevel === 2 ? '🔫完全形态（击杀再射一发）' : '提升🔫射速' }}
         </button>
       </template>
       <span v-else>🔫Lv.MAX（击杀再射一发）</span>
@@ -37,7 +37,7 @@
       </template>
       <template v-else-if="knifeLevel < 3">
         <button @click="upgradeKnife">
-          提升🔪伤害{{ knifeLevel === 2 ? '（击杀冻结敌人）' : '' }}
+          {{ knifeLevel === 2 ? '🔪完全形态（击杀冻结敌人）' : '提升🔪伤害' }}
         </button>
       </template>
       <span v-else>🔪Lv.MAX（击杀冻结敌人）</span>
@@ -47,7 +47,7 @@
       </template>
       <template v-else-if="flameLevel < 3">
         <button @click="upgradeFlame">
-          提升🔥穿透{{ flameLevel === 2 ? '（无限穿透并变大）' : '' }}
+          {{ flameLevel === 2 ? '🔥完全形态（无限穿透并变大）' : '提升🔥穿透' }}
         </button>
       </template>
       <span v-else>🔥Lv.MAX（无限穿透并变大）</span>
@@ -57,10 +57,15 @@
       </template>
       <template v-else-if="bombLevel < 3">
         <button @click="upgradeBomb">
-          提升💣范围{{ bombLevel === 2 ? '（吸附最近敌人）' : '' }}
+          {{ bombLevel === 2 ? '💣完全形态（吸附最近敌人）' : '提升💣范围' }}
         </button>
       </template>
       <span v-else>💣Lv.MAX（吸附最近敌人）</span>
+    </div>
+
+    <div v-if="gameOver" class="game-over-overlay">
+      <div>游戏结束！存活 {{ Math.floor(elapsed / 1000) }}s</div>
+      <button @click="restart">重新开始</button>
     </div>
   </div>
 </template>
@@ -117,11 +122,49 @@ const knifeLevel = ref(0)
 const flameLevel = ref(0)
 const bombLevel = ref(0)
 
+// 随机背景元素
+const backgrounds = []
+const bgEmojis = ['🌳','🌲','🌼','🌵','🌸','🌻','🍄','🌴','🌱','🪨','🌷','🌹']
+
+// 随机掉落道具
+const powerups = []
+const powerupTypes = [
+  { type: 'freeze', emoji: '🧊' },
+  { type: 'shield', emoji: '🛡️' },
+  { type: 'gravity', emoji: '🪂' },
+]
+let lastPowerup = 0
+let playerShield = false
+let knifeInterval = 200
+
 const levelEmojis = ['🙂','😊','😄','😁','😆','😎']
 const playerEmoji = ref(levelEmojis[0])
 const gameOver = ref(false)
 
 const enemyEmojis = ['👾', '👹', '👻', '🤖', '👺']
+
+function generateBackground() {
+  backgrounds.length = 0
+  for (let i = 0; i < 300; i++) {
+    backgrounds.push({
+      x: (Math.random() - 0.5) * 8000,
+      y: (Math.random() - 0.5) * 8000,
+      emoji: bgEmojis[Math.floor(Math.random() * bgEmojis.length)],
+    })
+  }
+}
+
+function spawnPowerup() {
+  const radius = 300
+  const angle = Math.random() * Math.PI * 2
+  const dist = Math.random() * radius
+  powerups.push({
+    x: player.x + Math.cos(angle) * dist,
+    y: player.y + Math.sin(angle) * dist,
+    size: 8,
+    ...powerupTypes[Math.floor(Math.random() * powerupTypes.length)],
+  })
+}
 
 function spawnEnemy() {
   const camX = player.x - width.value / 2
@@ -137,7 +180,7 @@ function spawnEnemy() {
   const hp = 1 + stage
   const speed = 0.5 + stage * 0.2
   const emoji = enemyEmojis[Math.min(stage, enemyEmojis.length - 1)]
-  enemies.push({ x, y, size: 10, hp, maxHp: hp, speed, emoji, freeze: 0 })
+  enemies.push({ x, y, size: 10, hp, maxHp: hp, speed, emoji, freeze: 0, vy: 0, isFalling: false, fallTime: 0 })
 }
 
 function getNearestEnemy(fromX = player.x, fromY = player.y) {
@@ -168,9 +211,8 @@ function shoot() {
 
 function update() {
   const now = Date.now()
-  elapsed.value = now - startTime.value
-
   if (paused) { draw(); return }
+  elapsed.value = now - startTime.value
 
   // 玩家移动，支持方向键与 WASD
   if (keys.has('arrowup') || keys.has('w')) player.y -= 3
@@ -183,6 +225,7 @@ function update() {
   if (now - lastSpawn > spawnInterval) { spawnEnemy(); lastSpawn = now }
 
   if (now - lastShoot > bulletInterval) { shoot(); lastShoot = now }
+  if (now - lastPowerup > 10000) { spawnPowerup(); lastPowerup = now }
 
   if (hasKnife.value) {
     const { enemy: nearest, dist: minDist, index: nearestIndex } = getNearestEnemy()
@@ -191,7 +234,7 @@ function update() {
       const ny = (nearest.y - player.y) / minDist
       knife.x = player.x + nx * knifeRange
       knife.y = player.y + ny * knifeRange
-      if (now - lastKnife > 500 && minDist < knifeRange) {
+      if (now - lastKnife > knifeInterval && minDist < knifeRange) {
         nearest.hp -= knifeDamage
         if (nearest.hp <= 0) {
           const ex = nearest.x, ey = nearest.y
@@ -235,8 +278,18 @@ function update() {
     lastBomb = now
   }
 
+  const camY = player.y - height.value / 2
   enemies.forEach(e => {
     if (e.freeze > 0) { e.freeze--; return }
+    if (e.isFalling) {
+      e.vy += 0.5
+      e.y += e.vy
+      const bottom = camY + height.value - e.size
+      if (e.y > bottom) { e.y = bottom; e.vy *= -0.6 }
+      e.fallTime--
+      if (e.fallTime <= 0) e.isFalling = false
+      return
+    }
     const dx = player.x - e.x
     const dy = player.y - e.y
     const len = Math.hypot(dx, dy)
@@ -244,14 +297,55 @@ function update() {
     e.y += (dy / len) * e.speed
   })
 
+  // 坠落敌人之间的碰撞
+  for (let i = 0; i < enemies.length; i++) {
+    const e1 = enemies[i]
+    if (!e1.isFalling) continue
+    for (let j = i + 1; j < enemies.length; j++) {
+      const e2 = enemies[j]
+      if (!e2.isFalling) continue
+      const dx = e2.x - e1.x
+      const dy = e2.y - e1.y
+      const dist = Math.hypot(dx, dy)
+      const min = e1.size + e2.size
+      if (dist < min && dist > 0) {
+        const overlap = (min - dist) / 2
+        const ox = dx / dist * overlap
+        const oy = dy / dist * overlap
+        e1.x -= ox
+        e1.y -= oy
+        e2.x += ox
+        e2.y += oy
+      }
+    }
+  }
+
   // 敌人碰撞玩家
-  for (const e of enemies) {
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i]
     if (Math.hypot(e.x - player.x, e.y - player.y) < e.size + player.size) {
-      playerEmoji.value = '😭'
-      paused = true
-      gameOver.value = true
-      showUpgrade.value = false
-      return
+      if (playerShield) {
+        playerShield = false
+        const ex = e.x, ey = e.y
+        enemies.splice(i, 1)
+        score.value++
+        xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
+        for (let j = enemies.length - 1; j >= 0; j--) {
+          if (Math.hypot(enemies[j].x - player.x, enemies[j].y - player.y) < 80) {
+            const ex2 = enemies[j].x, ey2 = enemies[j].y
+            enemies.splice(j, 1)
+            score.value++
+            xpOrbs.push({ x: ex2, y: ey2, size: 4, vx: 0, vy: 0 })
+          }
+        }
+        effects.push({ type: 'shield', x: player.x, y: player.y, ttl: 20, r: 40 })
+      } else {
+        playerEmoji.value = '😭'
+        paused = true
+        gameOver.value = true
+        showUpgrade.value = false
+        return
+      }
     }
   }
 
@@ -376,6 +470,25 @@ function update() {
     }
   }
 
+  // 道具拾取
+  for (let i = powerups.length - 1; i >= 0; i--) {
+    const p = powerups[i]
+    if (Math.hypot(p.x - player.x, p.y - player.y) < p.size + player.size) {
+      powerups.splice(i, 1)
+      if (p.type === 'freeze') {
+        enemies.forEach(e => { e.freeze = 180 })
+      } else if (p.type === 'shield') {
+        playerShield = true
+      } else if (p.type === 'gravity') {
+        enemies.forEach(e => {
+          e.isFalling = true
+          e.vy = 0
+          e.fallTime = 180
+        })
+      }
+    }
+  }
+
   draw()
 }
 
@@ -394,8 +507,20 @@ function draw() {
   ctx.value.textAlign = 'center'
   ctx.value.textBaseline = 'middle'
 
+  // 背景
+  backgrounds.forEach(bg => {
+    const sx = bg.x - camX
+    const sy = bg.y - camY
+    if (sx > -50 && sx < width.value + 50 && sy > -50 && sy < height.value + 50) {
+      ctx.value.fillText(bg.emoji, sx, sy)
+    }
+  })
+
   // 玩家
   ctx.value.fillText(playerEmoji.value, player.x - camX, player.y - camY)
+  if (playerShield) {
+    ctx.value.fillText('🛡️', player.x - camX, player.y - camY - 20)
+  }
 
   // 敌人及血条
   enemies.forEach(e => {
@@ -412,6 +537,11 @@ function draw() {
   // 经验球
   xpOrbs.forEach(xp => {
     ctx.value.fillText('✨', xp.x - camX, xp.y - camY)
+  })
+
+  // 道具
+  powerups.forEach(p => {
+    ctx.value.fillText(p.emoji, p.x - camX, p.y - camY)
   })
 
   // 子弹
@@ -442,21 +572,18 @@ function draw() {
     const ef = effects[i]
     const sx = ef.x - camX
     const sy = ef.y - camY
+    ctx.value.save()
+    ctx.value.font = ef.r * 2 + 'px sans-serif'
+    ctx.value.textAlign = 'center'
+    ctx.value.textBaseline = 'middle'
     if (ef.type === 'freeze') {
-      ctx.value.save()
-      ctx.value.font = ef.r * 2 + 'px sans-serif'
-      ctx.value.textAlign = 'center'
-      ctx.value.textBaseline = 'middle'
       ctx.value.fillText('❄️', sx, sy)
-      ctx.value.restore()
+    } else if (ef.type === 'shield') {
+      ctx.value.fillText('🛡️', sx, sy)
     } else {
-      ctx.value.save()
-      ctx.value.font = ef.r * 2 + 'px sans-serif'
-      ctx.value.textAlign = 'center'
-      ctx.value.textBaseline = 'middle'
       ctx.value.fillText('💥', sx, sy)
-      ctx.value.restore()
     }
+    ctx.value.restore()
     ef.ttl--
     if (ef.ttl <= 0) effects.splice(i, 1)
   }
@@ -477,6 +604,8 @@ function restart() {
   bombs.length = 0
   effects.length = 0
   xpOrbs.length = 0
+  powerups.length = 0
+  generateBackground()
   score.value = 0
   exp.value = 0
   level.value = 1
@@ -486,6 +615,9 @@ function restart() {
   knifeRange = 80
   flamePierce = 1
   bombRange = 40
+  playerShield = false
+  knifeInterval = 200
+  lastPowerup = Date.now()
   hasKnife.value = false
   hasFlame.value = false
   hasBomb.value = false
@@ -665,6 +797,19 @@ onUnmounted(() => {
   align-items: flex-end;
   gap: 0.2rem;
   color: #000;
+}
+
+.game-over-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
 }
 </style>
 
