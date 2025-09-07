@@ -42,7 +42,8 @@ const height = ref(window.innerHeight)
 
 const player = { x: 0, y: 0, size: 10 }
 const bulletDamage = 1
-const knifeDamage = 3
+// 刀的伤害较高，补偿其极短的攻击范围
+const knifeDamage = 10
 const bullets = []
 const flames = []
 const bombs = []
@@ -81,8 +82,11 @@ function spawnEnemy() {
   else if (side === 1) { x = camX + width.value + 20; y = camY + Math.random() * height.value }
   else if (side === 2) { x = camX + Math.random() * width.value; y = camY - 20 }
   else { x = camX + Math.random() * width.value; y = camY + height.value + 20 }
-  const hp = 3 + Math.floor(elapsed.value / 5000)
-  enemies.push({ x, y, size: 10, hp, maxHp: hp })
+  // 每 15 秒提升敌人类型，血量与速度随阶段增加
+  const stage = Math.floor(elapsed.value / 15000)
+  const hp = 1 + stage
+  const speed = 0.5 + stage * 0.2
+  enemies.push({ x, y, size: 10, hp, maxHp: hp, speed })
 }
 
 function shoot() {
@@ -106,8 +110,8 @@ function update() {
   if (keys.has('ArrowLeft')) player.x -= 3
   if (keys.has('ArrowRight')) player.x += 3
 
-  // 根据存活时间调整刷怪速度
-  const spawnInterval = Math.max(200, 1000 - Math.floor(elapsed.value / 20))
+  // 根据存活时间调整刷怪速度，减缓提升节奏
+  const spawnInterval = Math.max(400, 1000 - Math.floor(elapsed.value / 80))
   if (now - lastSpawn > spawnInterval) { spawnEnemy(); lastSpawn = now }
 
   if (now - lastShoot > 500) { shoot(); lastShoot = now }
@@ -151,8 +155,8 @@ function update() {
     const dx = player.x - e.x
     const dy = player.y - e.y
     const len = Math.hypot(dx, dy)
-    e.x += dx / len
-    e.y += dy / len
+    e.x += (dx / len) * e.speed
+    e.y += (dy / len) * e.speed
   })
 
   // 敌人碰撞玩家
