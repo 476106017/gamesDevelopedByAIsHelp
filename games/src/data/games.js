@@ -14,5 +14,9 @@ export default [
     {
         name: 'warehouse',
         thumbnail: './assets/warehouse.webp', // 可以用临时图
+    },
+    {
+        name: 'survivor',
+        thumbnail: '', // 暂无缩略图
     }
 ]
