@@ -912,6 +912,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  z-index: 10;
 }
 
 .exp-bar {
@@ -941,6 +942,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.5rem;
   align-items: center;
+  z-index: 20;
 }
 
 .tabs {
@@ -965,6 +967,7 @@ onUnmounted(() => {
   align-items: flex-end;
   gap: 0.2rem;
   color: #000;
+  z-index: 10;
 }
 
 .game-over-overlay {
@@ -978,6 +981,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.5rem;
   align-items: center;
+  z-index: 30;
 }
 </style>
 
