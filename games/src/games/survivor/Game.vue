@@ -24,9 +24,13 @@
     </div>
 
     <div v-if="showUpgrade" class="upgrade-overlay">
+      <button @click="upgradeBullet">提升🔫射速</button>
       <button v-if="!hasKnife" @click="unlockKnife">解锁🔪小刀</button>
+      <button v-else @click="upgradeKnife">提升🔪伤害</button>
       <button v-if="!hasFlame" @click="unlockFlame">解锁🔥火焰</button>
+      <button v-else @click="upgradeFlame">提升🔥穿透</button>
       <button v-if="!hasBomb" @click="unlockBomb">解锁💣炸弹</button>
+      <button v-else @click="upgradeBomb">提升💣范围</button>
     </div>
   </div>
 </template>
@@ -43,7 +47,7 @@ const height = ref(window.innerHeight)
 const player = { x: 0, y: 0, size: 10 }
 const bulletDamage = 1
 // 刀的伤害较高，补偿其极短的攻击范围
-const knifeDamage = 10
+let knifeDamage = 10
 const bullets = []
 const flames = []
 const bombs = []
@@ -66,12 +70,17 @@ const elapsed = ref(0)
 const exp = ref(0)
 const level = ref(1)
 const bulletSpeed = 4
+let bulletInterval = 500
+let flamePierce = 1
+let bombRange = 40
 let expToNext = 5
 const hasKnife = ref(false)
 const hasFlame = ref(false)
 const hasBomb = ref(false)
 const showUpgrade = ref(false)
 let paused = false
+
+const enemyEmojis = ['👾', '👹', '👻', '🤖', '👺']
 
 function spawnEnemy() {
   const camX = player.x - width.value / 2
@@ -86,7 +95,8 @@ function spawnEnemy() {
   const stage = Math.floor(elapsed.value / 15000)
   const hp = 1 + stage
   const speed = 0.5 + stage * 0.2
-  enemies.push({ x, y, size: 10, hp, maxHp: hp, speed })
+  const emoji = enemyEmojis[Math.min(stage, enemyEmojis.length - 1)]
+  enemies.push({ x, y, size: 10, hp, maxHp: hp, speed, emoji })
 }
 
 function shoot() {
@@ -114,22 +124,33 @@ function update() {
   const spawnInterval = Math.max(400, 1000 - Math.floor(elapsed.value / 80))
   if (now - lastSpawn > spawnInterval) { spawnEnemy(); lastSpawn = now }
 
-  if (now - lastShoot > 500) { shoot(); lastShoot = now }
+  if (now - lastShoot > bulletInterval) { shoot(); lastShoot = now }
 
   if (hasKnife.value && now - lastKnife > 800) {
-    for (let i = enemies.length - 1; i >= 0; i--) {
+    let nearest = null
+    let nearestIndex = -1
+    let minDist = Infinity
+    for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i]
-      if (Math.hypot(e.x - player.x, e.y - player.y) < 25) {
-        e.hp -= knifeDamage
-        if (e.hp <= 0) {
-          const ex = e.x, ey = e.y
-          enemies.splice(i, 1)
+      const d = Math.hypot(e.x - player.x, e.y - player.y)
+      if (d < minDist) { minDist = d; nearest = e; nearestIndex = i }
+    }
+    if (nearest) {
+      const nx = (nearest.x - player.x) / minDist
+      const ny = (nearest.y - player.y) / minDist
+      const sx = player.x + nx * 15
+      const sy = player.y + ny * 15
+      if (minDist < 30) {
+        nearest.hp -= knifeDamage
+        if (nearest.hp <= 0) {
+          const ex = nearest.x, ey = nearest.y
+          enemies.splice(nearestIndex, 1)
           score.value++
           xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
         }
       }
+      effects.push({ type: 'slash', x: sx, y: sy, ttl: 10 })
     }
-    effects.push({ type: 'slash', x: player.x, y: player.y, ttl: 10 })
     lastKnife = now
   }
 
@@ -138,7 +159,7 @@ function update() {
     const dx = target.x - player.x
     const dy = target.y - player.y
     const len = Math.hypot(dx, dy)
-    flames.push({ x: player.x, y: player.y, vx: dx / len * 2, vy: dy / len * 2, life: 40, size: 6 })
+    flames.push({ x: player.x, y: player.y, vx: dx / len * 2, vy: dy / len * 2, life: 40, size: 6, pierce: flamePierce })
     lastFlame = now
   }
 
@@ -188,6 +209,7 @@ function update() {
     f.y += f.vy
     f.life--
     if (f.life <= 0) { flames.splice(i, 1); continue }
+    let removed = false
     for (let j = enemies.length - 1; j >= 0; j--) {
       const e = enemies[j]
       if (Math.hypot(e.x - f.x, e.y - f.y) < e.size + f.size) {
@@ -198,10 +220,11 @@ function update() {
           score.value++
           xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
         }
-        f.life = 0
-        break
+        f.pierce--
+        if (f.pierce <= 0) { flames.splice(i, 1); removed = true; break }
       }
     }
+    if (!removed && f.life <= 0) flames.splice(i, 1)
   }
 
   // 炸弹移动
@@ -214,7 +237,7 @@ function update() {
     if (Math.hypot(m.vx, m.vy) < 0.3) {
       for (let j = enemies.length - 1; j >= 0; j--) {
         const e = enemies[j]
-        if (Math.hypot(e.x - m.x, e.y - m.y) < 40) {
+        if (Math.hypot(e.x - m.x, e.y - m.y) < bombRange) {
           const ex = e.x, ey = e.y
           enemies.splice(j, 1)
           score.value++
@@ -287,7 +310,7 @@ function draw() {
   enemies.forEach(e => {
     const sx = e.x - camX
     const sy = e.y - camY
-    ctx.value.fillText('👾', sx, sy)
+    ctx.value.fillText(e.emoji, sx, sy)
     ctx.value.fillStyle = 'red'
     ctx.value.fillRect(sx - e.size, sy - e.size - 6, e.size * 2, 4)
     ctx.value.fillStyle = 'green'
@@ -345,6 +368,10 @@ function restart() {
   exp.value = 0
   level.value = 1
   expToNext = 5
+  bulletInterval = 500
+  knifeDamage = 10
+  flamePierce = 1
+  bombRange = 40
   hasKnife.value = false
   hasFlame.value = false
   hasBomb.value = false
@@ -364,10 +391,8 @@ function levelUp() {
   exp.value -= expToNext
   level.value++
   expToNext = Math.floor(expToNext * 1.5)
-  if (!hasKnife.value || !hasFlame.value || !hasBomb.value) {
-    paused = true
-    showUpgrade.value = true
-  }
+  paused = true
+  showUpgrade.value = true
 }
 
 function unlockKnife() {
@@ -384,6 +409,30 @@ function unlockFlame() {
 
 function unlockBomb() {
   hasBomb.value = true
+  showUpgrade.value = false
+  paused = false
+}
+
+function upgradeBullet() {
+  bulletInterval = Math.max(100, bulletInterval - 50)
+  showUpgrade.value = false
+  paused = false
+}
+
+function upgradeKnife() {
+  knifeDamage += 5
+  showUpgrade.value = false
+  paused = false
+}
+
+function upgradeFlame() {
+  flamePierce++
+  showUpgrade.value = false
+  paused = false
+}
+
+function upgradeBomb() {
+  bombRange += 10
   showUpgrade.value = false
   paused = false
 }
