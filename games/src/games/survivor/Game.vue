@@ -25,13 +25,42 @@
     </div>
 
     <div v-if="showUpgrade" class="upgrade-overlay">
-      <button @click="upgradeBullet">提升🔫射速</button>
-      <button v-if="!hasKnife" @click="unlockKnife">解锁🔪小刀</button>
-      <button v-else @click="upgradeKnife">提升🔪伤害</button>
-      <button v-if="!hasFlame" @click="unlockFlame">解锁🔥火焰</button>
-      <button v-else @click="upgradeFlame">提升🔥穿透</button>
-      <button v-if="!hasBomb" @click="unlockBomb">解锁💣炸弹</button>
-      <button v-else @click="upgradeBomb">提升💣范围</button>
+      <template v-if="bulletLevel < 3">
+        <button @click="upgradeBullet">
+          提升🔫射速{{ bulletLevel === 2 ? '（击杀再射一发）' : '' }}
+        </button>
+      </template>
+      <span v-else>🔫Lv.MAX（击杀再射一发）</span>
+
+      <template v-if="!hasKnife">
+        <button @click="unlockKnife">解锁🔪小刀</button>
+      </template>
+      <template v-else-if="knifeLevel < 3">
+        <button @click="upgradeKnife">
+          提升🔪伤害{{ knifeLevel === 2 ? '（击杀冻结敌人）' : '' }}
+        </button>
+      </template>
+      <span v-else>🔪Lv.MAX（击杀冻结敌人）</span>
+
+      <template v-if="!hasFlame">
+        <button @click="unlockFlame">解锁🔥火焰</button>
+      </template>
+      <template v-else-if="flameLevel < 3">
+        <button @click="upgradeFlame">
+          提升🔥穿透{{ flameLevel === 2 ? '（无限穿透并变大）' : '' }}
+        </button>
+      </template>
+      <span v-else>🔥Lv.MAX（无限穿透并变大）</span>
+
+      <template v-if="!hasBomb">
+        <button @click="unlockBomb">解锁💣炸弹</button>
+      </template>
+      <template v-else-if="bombLevel < 3">
+        <button @click="upgradeBomb">
+          提升💣范围{{ bombLevel === 2 ? '（吸附最近敌人）' : '' }}
+        </button>
+      </template>
+      <span v-else>💣Lv.MAX（吸附最近敌人）</span>
     </div>
   </div>
 </template>
@@ -49,7 +78,8 @@ const player = { x: 0, y: 0, size: 10 }
 const bulletDamage = 1
 // 刀的伤害较高，补偿其极短的攻击范围
 let knifeDamage = 10
-let knifeRange = 50
+let knifeRange = 80
+const knife = { x: 0, y: 0 }
 const bullets = []
 const flames = []
 const bombs = []
@@ -154,14 +184,14 @@ function update() {
 
   if (now - lastShoot > bulletInterval) { shoot(); lastShoot = now }
 
-  if (hasKnife.value && now - lastKnife > 500) {
+  if (hasKnife.value) {
     const { enemy: nearest, dist: minDist, index: nearestIndex } = getNearestEnemy()
     if (nearest) {
       const nx = (nearest.x - player.x) / minDist
       const ny = (nearest.y - player.y) / minDist
-      const sx = player.x + nx * (knifeRange * 0.7)
-      const sy = player.y + ny * (knifeRange * 0.7)
-      if (minDist < knifeRange) {
+      knife.x = player.x + nx * knifeRange
+      knife.y = player.y + ny * knifeRange
+      if (now - lastKnife > 500 && minDist < knifeRange) {
         nearest.hp -= knifeDamage
         if (nearest.hp <= 0) {
           const ex = nearest.x, ey = nearest.y
@@ -175,10 +205,12 @@ function update() {
             effects.push({ type: 'freeze', x: ex, y: ey, ttl: 30, r: 50 })
           }
         }
+        lastKnife = now
       }
-      effects.push({ type: 'slash', x: sx, y: sy, ttl: 10 })
+    } else {
+      knife.x = player.x + knifeRange
+      knife.y = player.y
     }
-    lastKnife = now
   }
 
   if (hasFlame.value && now - lastFlame > 1000 && enemies.length) {
@@ -400,14 +432,17 @@ function draw() {
     ctx.value.fillText('💣', m.x - camX, m.y - camY)
   })
 
+  // 小刀
+  if (hasKnife.value) {
+    ctx.value.fillText('🔪', knife.x - camX, knife.y - camY)
+  }
+
   // 效果
   for (let i = effects.length - 1; i >= 0; i--) {
     const ef = effects[i]
     const sx = ef.x - camX
     const sy = ef.y - camY
-    if (ef.type === 'slash') {
-      ctx.value.fillText('🔪', sx, sy)
-    } else if (ef.type === 'freeze') {
+    if (ef.type === 'freeze') {
       ctx.value.save()
       ctx.value.font = ef.r * 2 + 'px sans-serif'
       ctx.value.textAlign = 'center'
@@ -448,7 +483,7 @@ function restart() {
   expToNext = 5
   bulletInterval = 500
   knifeDamage = 10
-  knifeRange = 50
+  knifeRange = 80
   flamePierce = 1
   bombRange = 40
   hasKnife.value = false
@@ -464,6 +499,8 @@ function restart() {
   lastBomb = 0
   player.x = 0
   player.y = 0
+  knife.x = player.x + knifeRange
+  knife.y = player.y
   startTime.value = Date.now()
   keys.clear()
   showUpgrade.value = false
@@ -477,8 +514,15 @@ function levelUp() {
   level.value++
   expToNext = Math.floor(expToNext * 1.5)
   playerEmoji.value = levelEmojis[Math.min(level.value - 1, levelEmojis.length - 1)]
-  paused = true
-  showUpgrade.value = true
+  const upgradesAvailable =
+    bulletLevel.value < 3 ||
+    !hasKnife.value || knifeLevel.value < 3 ||
+    !hasFlame.value || flameLevel.value < 3 ||
+    !hasBomb.value || bombLevel.value < 3
+  if (upgradesAvailable) {
+    paused = true
+    showUpgrade.value = true
+  }
 }
 
 function unlockKnife() {
@@ -503,6 +547,7 @@ function unlockBomb() {
 }
 
 function upgradeBullet() {
+  if (bulletLevel.value >= 3) return
   bulletInterval = Math.max(100, bulletInterval - 50)
   bulletLevel.value++
   showUpgrade.value = false
@@ -510,6 +555,7 @@ function upgradeBullet() {
 }
 
 function upgradeKnife() {
+  if (knifeLevel.value >= 3) return
   knifeDamage += 5
   knifeLevel.value++
   showUpgrade.value = false
@@ -517,6 +563,7 @@ function upgradeKnife() {
 }
 
 function upgradeFlame() {
+  if (flameLevel.value >= 3) return
   flamePierce++
   flameLevel.value++
   showUpgrade.value = false
@@ -524,6 +571,7 @@ function upgradeFlame() {
 }
 
 function upgradeBomb() {
+  if (bombLevel.value >= 3) return
   bombRange += 20
   bombLevel.value++
   showUpgrade.value = false
