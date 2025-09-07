@@ -9,7 +9,13 @@
 
     <div class="hud">
       <div class="info">
-        存活时间：{{ Math.floor(elapsed / 1000) }}秒 | 击败：{{ score }} | 等级：{{ level }}
+        🕒 {{ Math.floor(elapsed / 1000) }}s | 👾 {{ score }} | ⭐ {{ level }}
+      </div>
+      <div class="weapons">
+        🔫
+        <span v-if="hasKnife">🔪</span>
+        <span v-if="hasFlame">🔥</span>
+        <span v-if="hasBomb">💣</span>
       </div>
       <div class="exp-bar">
         <div class="exp-fill" :style="{ width: (exp / expToNext * 100) + '%' }"></div>
@@ -18,9 +24,9 @@
     </div>
 
     <div v-if="showUpgrade" class="upgrade-overlay">
-      <button v-if="!hasKnife" @click="unlockKnife">解锁小刀</button>
-      <button v-if="!hasFlame" @click="unlockFlame">解锁火焰</button>
-      <button v-if="!hasBomb" @click="unlockBomb">解锁炸弹</button>
+      <button v-if="!hasKnife" @click="unlockKnife">解锁🔪小刀</button>
+      <button v-if="!hasFlame" @click="unlockFlame">解锁🔥火焰</button>
+      <button v-if="!hasBomb" @click="unlockBomb">解锁💣炸弹</button>
     </div>
   </div>
 </template>
@@ -34,7 +40,9 @@ const ctx = ref(null)
 const width = ref(window.innerWidth)
 const height = ref(window.innerHeight)
 
-const player = { x: width.value / 2, y: height.value / 2, size: 10 }
+const player = { x: 0, y: 0, size: 10 }
+const bulletDamage = 1
+const knifeDamage = 3
 const bullets = []
 const flames = []
 const bombs = []
@@ -65,13 +73,16 @@ const showUpgrade = ref(false)
 let paused = false
 
 function spawnEnemy() {
+  const camX = player.x - width.value / 2
+  const camY = player.y - height.value / 2
   const side = Math.floor(Math.random() * 4)
   let x, y
-  if (side === 0) { x = 0; y = Math.random() * height.value }
-  else if (side === 1) { x = width.value; y = Math.random() * height.value }
-  else if (side === 2) { x = Math.random() * width.value; y = 0 }
-  else { x = Math.random() * width.value; y = height.value }
-  enemies.push({ x, y, size: 10 })
+  if (side === 0) { x = camX - 20; y = camY + Math.random() * height.value }
+  else if (side === 1) { x = camX + width.value + 20; y = camY + Math.random() * height.value }
+  else if (side === 2) { x = camX + Math.random() * width.value; y = camY - 20 }
+  else { x = camX + Math.random() * width.value; y = camY + height.value + 20 }
+  const hp = 3 + Math.floor(elapsed.value / 5000)
+  enemies.push({ x, y, size: 10, hp, maxHp: hp })
 }
 
 function shoot() {
@@ -90,10 +101,10 @@ function update() {
   if (paused) { draw(); return }
 
   // 玩家移动
-  if (keys.has('ArrowUp')) player.y = Math.max(player.size, player.y - 3)
-  if (keys.has('ArrowDown')) player.y = Math.min(height.value - player.size, player.y + 3)
-  if (keys.has('ArrowLeft')) player.x = Math.max(player.size, player.x - 3)
-  if (keys.has('ArrowRight')) player.x = Math.min(width.value - player.size, player.x + 3)
+  if (keys.has('ArrowUp')) player.y -= 3
+  if (keys.has('ArrowDown')) player.y += 3
+  if (keys.has('ArrowLeft')) player.x -= 3
+  if (keys.has('ArrowRight')) player.x += 3
 
   // 根据存活时间调整刷怪速度
   const spawnInterval = Math.max(200, 1000 - Math.floor(elapsed.value / 20))
@@ -105,9 +116,13 @@ function update() {
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i]
       if (Math.hypot(e.x - player.x, e.y - player.y) < 25) {
-        enemies.splice(i, 1)
-        score.value++
-        xpOrbs.push({ x: e.x, y: e.y, size: 4, vx: 0, vy: 0 })
+        e.hp -= knifeDamage
+        if (e.hp <= 0) {
+          const ex = e.x, ey = e.y
+          enemies.splice(i, 1)
+          score.value++
+          xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
+        }
       }
     }
     effects.push({ type: 'slash', x: player.x, y: player.y, ttl: 10 })
@@ -154,7 +169,12 @@ function update() {
     const b = bullets[i]
     b.x += b.vx
     b.y += b.vy
-    if (b.x < 0 || b.x > width.value || b.y < 0 || b.y > height.value) bullets.splice(i, 1)
+    if (
+      b.x < player.x - width.value / 2 - 100 ||
+      b.x > player.x + width.value / 2 + 100 ||
+      b.y < player.y - height.value / 2 - 100 ||
+      b.y > player.y + height.value / 2 + 100
+    ) bullets.splice(i, 1)
   }
 
   // 火焰移动
@@ -167,10 +187,13 @@ function update() {
     for (let j = enemies.length - 1; j >= 0; j--) {
       const e = enemies[j]
       if (Math.hypot(e.x - f.x, e.y - f.y) < e.size + f.size) {
-        const ex = e.x, ey = e.y
-        enemies.splice(j, 1)
-        score.value++
-        xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
+        e.hp -= 2
+        if (e.hp <= 0) {
+          const ex = e.x, ey = e.y
+          enemies.splice(j, 1)
+          score.value++
+          xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
+        }
         f.life = 0
         break
       }
@@ -199,18 +222,20 @@ function update() {
     }
   }
 
-  // 碰撞检测
+  // 子弹碰撞敌人
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i]
     for (let j = bullets.length - 1; j >= 0; j--) {
       const b = bullets[j]
       if (Math.hypot(e.x - b.x, e.y - b.y) < e.size + b.size) {
-        const ex = e.x
-        const ey = e.y
-        enemies.splice(i, 1)
+        e.hp -= bulletDamage
         bullets.splice(j, 1)
-        score.value++
-        xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
+        if (e.hp <= 0) {
+          const ex = e.x, ey = e.y
+          enemies.splice(i, 1)
+          score.value++
+          xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
+        }
         break
       }
     }
@@ -244,59 +269,54 @@ function loop() {
 function draw() {
   ctx.value.clearRect(0, 0, width.value, height.value)
 
-  ctx.value.fillStyle = 'blue'
-  ctx.value.beginPath()
-  ctx.value.arc(player.x, player.y, player.size, 0, Math.PI * 2)
-  ctx.value.fill()
+  const camX = player.x - width.value / 2
+  const camY = player.y - height.value / 2
 
-  ctx.value.fillStyle = 'red'
+  ctx.value.font = '20px sans-serif'
+  ctx.value.textAlign = 'center'
+  ctx.value.textBaseline = 'middle'
+
+  // 玩家
+  ctx.value.fillText('🙂', player.x - camX, player.y - camY)
+
+  // 敌人及血条
   enemies.forEach(e => {
-    ctx.value.beginPath()
-    ctx.value.arc(e.x, e.y, e.size, 0, Math.PI * 2)
-    ctx.value.fill()
+    const sx = e.x - camX
+    const sy = e.y - camY
+    ctx.value.fillText('👾', sx, sy)
+    ctx.value.fillStyle = 'red'
+    ctx.value.fillRect(sx - e.size, sy - e.size - 6, e.size * 2, 4)
+    ctx.value.fillStyle = 'green'
+    ctx.value.fillRect(sx - e.size, sy - e.size - 6, e.size * 2 * (e.hp / e.maxHp), 4)
+    ctx.value.fillStyle = 'black'
   })
 
-  ctx.value.fillStyle = 'green'
+  // 经验球
   xpOrbs.forEach(xp => {
-    ctx.value.beginPath()
-    ctx.value.arc(xp.x, xp.y, xp.size, 0, Math.PI * 2)
-    ctx.value.fill()
+    ctx.value.fillText('✨', xp.x - camX, xp.y - camY)
   })
 
-  ctx.value.fillStyle = 'black'
+  // 子弹
   bullets.forEach(b => {
-    ctx.value.beginPath()
-    ctx.value.arc(b.x, b.y, b.size, 0, Math.PI * 2)
-    ctx.value.fill()
+    ctx.value.fillText('🔹', b.x - camX, b.y - camY)
   })
 
-  ctx.value.fillStyle = 'orange'
+  // 火焰
   flames.forEach(f => {
-    ctx.value.beginPath()
-    ctx.value.arc(f.x, f.y, f.size, 0, Math.PI * 2)
-    ctx.value.fill()
+    ctx.value.fillText('🔥', f.x - camX, f.y - camY)
   })
 
-  ctx.value.fillStyle = 'purple'
+  // 炸弹
   bombs.forEach(m => {
-    ctx.value.beginPath()
-    ctx.value.arc(m.x, m.y, m.size, 0, Math.PI * 2)
-    ctx.value.fill()
+    ctx.value.fillText('💣', m.x - camX, m.y - camY)
   })
 
+  // 效果
   for (let i = effects.length - 1; i >= 0; i--) {
     const ef = effects[i]
-    if (ef.type === 'slash') {
-      ctx.value.strokeStyle = 'silver'
-      ctx.value.beginPath()
-      ctx.value.arc(ef.x, ef.y, 20, 0, Math.PI * 2)
-      ctx.value.stroke()
-    } else if (ef.type === 'boom') {
-      ctx.value.strokeStyle = 'orange'
-      ctx.value.beginPath()
-      ctx.value.arc(ef.x, ef.y, 40, 0, Math.PI * 2)
-      ctx.value.stroke()
-    }
+    const sx = ef.x - camX
+    const sy = ef.y - camY
+    ctx.value.fillText(ef.type === 'slash' ? '🔪' : '💥', sx, sy)
     ef.ttl--
     if (ef.ttl <= 0) effects.splice(i, 1)
   }
@@ -328,8 +348,8 @@ function restart() {
   lastKnife = 0
   lastFlame = 0
   lastBomb = 0
-  player.x = width.value / 2
-  player.y = height.value / 2
+  player.x = 0
+  player.y = 0
   startTime.value = Date.now()
   keys.clear()
   showUpgrade.value = false
@@ -416,6 +436,10 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.weapons {
+  font-size: 1.2rem;
 }
 
 .exp-bar {
