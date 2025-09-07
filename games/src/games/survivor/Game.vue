@@ -18,8 +18,9 @@
     </div>
 
     <div v-if="showUpgrade" class="upgrade-overlay">
-      <button @click="upgradeBullet">提升子弹速度</button>
-      <button v-if="!hasPulse" @click="upgradePulse">解锁范围攻击</button>
+      <button v-if="!hasKnife" @click="unlockKnife">解锁小刀</button>
+      <button v-if="!hasFlame" @click="unlockFlame">解锁火焰</button>
+      <button v-if="!hasBomb" @click="unlockBomb">解锁炸弹</button>
     </div>
   </div>
 </template>
@@ -35,13 +36,18 @@ const height = ref(window.innerHeight)
 
 const player = { x: width.value / 2, y: height.value / 2, size: 10 }
 const bullets = []
+const flames = []
+const bombs = []
+const effects = []
 const enemies = []
 const xpOrbs = []
 const keys = new Set()
 
 let lastSpawn = 0
 let lastShoot = 0
-let lastPulse = 0
+let lastKnife = 0
+let lastFlame = 0
+let lastBomb = 0
 let animationFrameId = 0
 
 const score = ref(0)
@@ -50,9 +56,11 @@ const elapsed = ref(0)
 
 const exp = ref(0)
 const level = ref(1)
-const bulletSpeed = ref(4)
+const bulletSpeed = 4
 let expToNext = 5
-const hasPulse = ref(false)
+const hasKnife = ref(false)
+const hasFlame = ref(false)
+const hasBomb = ref(false)
 const showUpgrade = ref(false)
 let paused = false
 
@@ -72,18 +80,7 @@ function shoot() {
   const dx = target.x - player.x
   const dy = target.y - player.y
   const len = Math.hypot(dx, dy)
-  bullets.push({ x: player.x, y: player.y, vx: dx / len * bulletSpeed.value, vy: dy / len * bulletSpeed.value, size: 4 })
-}
-
-function pulse() {
-  for (let i = enemies.length - 1; i >= 0; i--) {
-    const e = enemies[i]
-    if (Math.hypot(e.x - player.x, e.y - player.y) < 60) {
-      enemies.splice(i, 1)
-      score.value++
-      xpOrbs.push({ x: e.x, y: e.y, size: 4 })
-    }
-  }
+  bullets.push({ x: player.x, y: player.y, vx: dx / len * bulletSpeed, vy: dy / len * bulletSpeed, size: 4 })
 }
 
 function update() {
@@ -103,7 +100,37 @@ function update() {
   if (now - lastSpawn > spawnInterval) { spawnEnemy(); lastSpawn = now }
 
   if (now - lastShoot > 500) { shoot(); lastShoot = now }
-  if (hasPulse.value && now - lastPulse > 3000) { pulse(); lastPulse = now }
+
+  if (hasKnife.value && now - lastKnife > 800) {
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i]
+      if (Math.hypot(e.x - player.x, e.y - player.y) < 25) {
+        enemies.splice(i, 1)
+        score.value++
+        xpOrbs.push({ x: e.x, y: e.y, size: 4, vx: 0, vy: 0 })
+      }
+    }
+    effects.push({ type: 'slash', x: player.x, y: player.y, ttl: 10 })
+    lastKnife = now
+  }
+
+  if (hasFlame.value && now - lastFlame > 1000 && enemies.length) {
+    const target = enemies[0]
+    const dx = target.x - player.x
+    const dy = target.y - player.y
+    const len = Math.hypot(dx, dy)
+    flames.push({ x: player.x, y: player.y, vx: dx / len * 2, vy: dy / len * 2, life: 40, size: 6 })
+    lastFlame = now
+  }
+
+  if (hasBomb.value && now - lastBomb > 2000 && enemies.length) {
+    const target = enemies[0]
+    const dx = target.x - player.x
+    const dy = target.y - player.y
+    const len = Math.hypot(dx, dy)
+    bombs.push({ x: player.x, y: player.y, vx: dx / len * 3, vy: dy / len * 3, size: 6 })
+    lastBomb = now
+  }
 
   enemies.forEach(e => {
     const dx = player.x - e.x
@@ -130,6 +157,48 @@ function update() {
     if (b.x < 0 || b.x > width.value || b.y < 0 || b.y > height.value) bullets.splice(i, 1)
   }
 
+  // 火焰移动
+  for (let i = flames.length - 1; i >= 0; i--) {
+    const f = flames[i]
+    f.x += f.vx
+    f.y += f.vy
+    f.life--
+    if (f.life <= 0) { flames.splice(i, 1); continue }
+    for (let j = enemies.length - 1; j >= 0; j--) {
+      const e = enemies[j]
+      if (Math.hypot(e.x - f.x, e.y - f.y) < e.size + f.size) {
+        const ex = e.x, ey = e.y
+        enemies.splice(j, 1)
+        score.value++
+        xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
+        f.life = 0
+        break
+      }
+    }
+  }
+
+  // 炸弹移动
+  for (let i = bombs.length - 1; i >= 0; i--) {
+    const m = bombs[i]
+    m.x += m.vx
+    m.y += m.vy
+    m.vx *= 0.98
+    m.vy *= 0.98
+    if (Math.hypot(m.vx, m.vy) < 0.3) {
+      for (let j = enemies.length - 1; j >= 0; j--) {
+        const e = enemies[j]
+        if (Math.hypot(e.x - m.x, e.y - m.y) < 40) {
+          const ex = e.x, ey = e.y
+          enemies.splice(j, 1)
+          score.value++
+          xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
+        }
+      }
+      effects.push({ type: 'boom', x: m.x, y: m.y, ttl: 20 })
+      bombs.splice(i, 1)
+    }
+  }
+
   // 碰撞检测
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i]
@@ -141,16 +210,23 @@ function update() {
         enemies.splice(i, 1)
         bullets.splice(j, 1)
         score.value++
-        xpOrbs.push({ x: ex, y: ey, size: 4 })
+        xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
         break
       }
     }
   }
 
-  // 经验球拾取
+  // 经验球吸收
   for (let i = xpOrbs.length - 1; i >= 0; i--) {
     const xp = xpOrbs[i]
-    if (Math.hypot(xp.x - player.x, xp.y - player.y) < xp.size + player.size) {
+    const dx = player.x - xp.x
+    const dy = player.y - xp.y
+    const dist = Math.hypot(dx, dy)
+    if (dist < 80 && dist > 0) {
+      xp.x += dx / dist * 4
+      xp.y += dy / dist * 4
+    }
+    if (dist < xp.size + player.size) {
       xpOrbs.splice(i, 1)
       exp.value++
       if (exp.value >= expToNext) levelUp()
@@ -193,6 +269,37 @@ function draw() {
     ctx.value.arc(b.x, b.y, b.size, 0, Math.PI * 2)
     ctx.value.fill()
   })
+
+  ctx.value.fillStyle = 'orange'
+  flames.forEach(f => {
+    ctx.value.beginPath()
+    ctx.value.arc(f.x, f.y, f.size, 0, Math.PI * 2)
+    ctx.value.fill()
+  })
+
+  ctx.value.fillStyle = 'purple'
+  bombs.forEach(m => {
+    ctx.value.beginPath()
+    ctx.value.arc(m.x, m.y, m.size, 0, Math.PI * 2)
+    ctx.value.fill()
+  })
+
+  for (let i = effects.length - 1; i >= 0; i--) {
+    const ef = effects[i]
+    if (ef.type === 'slash') {
+      ctx.value.strokeStyle = 'silver'
+      ctx.value.beginPath()
+      ctx.value.arc(ef.x, ef.y, 20, 0, Math.PI * 2)
+      ctx.value.stroke()
+    } else if (ef.type === 'boom') {
+      ctx.value.strokeStyle = 'orange'
+      ctx.value.beginPath()
+      ctx.value.arc(ef.x, ef.y, 40, 0, Math.PI * 2)
+      ctx.value.stroke()
+    }
+    ef.ttl--
+    if (ef.ttl <= 0) effects.splice(i, 1)
+  }
 }
 
 function handleKeyDown(e) {
@@ -206,13 +313,21 @@ function handleKeyUp(e) {
 function restart() {
   enemies.length = 0
   bullets.length = 0
+  flames.length = 0
+  bombs.length = 0
+  effects.length = 0
   xpOrbs.length = 0
   score.value = 0
   exp.value = 0
   level.value = 1
   expToNext = 5
-  bulletSpeed.value = 4
-  hasPulse.value = false
+  hasKnife.value = false
+  hasFlame.value = false
+  hasBomb.value = false
+  lastShoot = 0
+  lastKnife = 0
+  lastFlame = 0
+  lastBomb = 0
   player.x = width.value / 2
   player.y = height.value / 2
   startTime.value = Date.now()
@@ -225,18 +340,26 @@ function levelUp() {
   exp.value -= expToNext
   level.value++
   expToNext = Math.floor(expToNext * 1.5)
-  paused = true
-  showUpgrade.value = true
+  if (!hasKnife.value || !hasFlame.value || !hasBomb.value) {
+    paused = true
+    showUpgrade.value = true
+  }
 }
 
-function upgradeBullet() {
-  bulletSpeed.value += 1
+function unlockKnife() {
+  hasKnife.value = true
   showUpgrade.value = false
   paused = false
 }
 
-function upgradePulse() {
-  hasPulse.value = true
+function unlockFlame() {
+  hasFlame.value = true
+  showUpgrade.value = false
+  paused = false
+}
+
+function unlockBomb() {
+  hasBomb.value = true
   showUpgrade.value = false
   paused = false
 }
@@ -287,7 +410,7 @@ onUnmounted(() => {
 
 .hud {
   position: absolute;
-  top: 10px;
+  bottom: 10px;
   left: 10px;
   color: #000;
   display: flex;
