@@ -48,6 +48,7 @@ const player = { x: 0, y: 0, size: 10 }
 const bulletDamage = 1
 // 刀的伤害较高，补偿其极短的攻击范围
 let knifeDamage = 10
+let knifeRange = 50
 const bullets = []
 const flames = []
 const bombs = []
@@ -99,9 +100,26 @@ function spawnEnemy() {
   enemies.push({ x, y, size: 10, hp, maxHp: hp, speed, emoji })
 }
 
+function getNearestEnemy() {
+  let nearest = null
+  let minDist = Infinity
+  let index = -1
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i]
+    const d = Math.hypot(e.x - player.x, e.y - player.y)
+    if (d < minDist) {
+      minDist = d
+      nearest = e
+      index = i
+    }
+  }
+  return { enemy: nearest, dist: minDist, index }
+}
+
 function shoot() {
   if (enemies.length === 0) return
-  const target = enemies[0]
+  const { enemy: target } = getNearestEnemy()
+  if (!target) return
   const dx = target.x - player.x
   const dy = target.y - player.y
   const len = Math.hypot(dx, dy)
@@ -127,20 +145,13 @@ function update() {
   if (now - lastShoot > bulletInterval) { shoot(); lastShoot = now }
 
   if (hasKnife.value && now - lastKnife > 800) {
-    let nearest = null
-    let nearestIndex = -1
-    let minDist = Infinity
-    for (let i = 0; i < enemies.length; i++) {
-      const e = enemies[i]
-      const d = Math.hypot(e.x - player.x, e.y - player.y)
-      if (d < minDist) { minDist = d; nearest = e; nearestIndex = i }
-    }
+    const { enemy: nearest, dist: minDist, index: nearestIndex } = getNearestEnemy()
     if (nearest) {
       const nx = (nearest.x - player.x) / minDist
       const ny = (nearest.y - player.y) / minDist
-      const sx = player.x + nx * 15
-      const sy = player.y + ny * 15
-      if (minDist < 30) {
+      const sx = player.x + nx * (knifeRange * 0.7)
+      const sy = player.y + ny * (knifeRange * 0.7)
+      if (minDist < knifeRange) {
         nearest.hp -= knifeDamage
         if (nearest.hp <= 0) {
           const ex = nearest.x, ey = nearest.y
@@ -155,20 +166,24 @@ function update() {
   }
 
   if (hasFlame.value && now - lastFlame > 1000 && enemies.length) {
-    const target = enemies[0]
-    const dx = target.x - player.x
-    const dy = target.y - player.y
-    const len = Math.hypot(dx, dy)
-    flames.push({ x: player.x, y: player.y, vx: dx / len * 2, vy: dy / len * 2, life: 40, size: 6, pierce: flamePierce })
+    const { enemy: target } = getNearestEnemy()
+    if (target) {
+      const dx = target.x - player.x
+      const dy = target.y - player.y
+      const len = Math.hypot(dx, dy)
+      flames.push({ x: player.x, y: player.y, vx: dx / len * 3, vy: dy / len * 3, life: 60, size: 6, pierce: flamePierce })
+    }
     lastFlame = now
   }
 
   if (hasBomb.value && now - lastBomb > 2000 && enemies.length) {
-    const target = enemies[0]
-    const dx = target.x - player.x
-    const dy = target.y - player.y
-    const len = Math.hypot(dx, dy)
-    bombs.push({ x: player.x, y: player.y, vx: dx / len * 3, vy: dy / len * 3, size: 6 })
+    const { enemy: target } = getNearestEnemy()
+    if (target) {
+      const dx = target.x - player.x
+      const dy = target.y - player.y
+      const len = Math.hypot(dx, dy)
+      bombs.push({ x: player.x, y: player.y, vx: dx / len * 3, vy: dy / len * 3, size: 6 })
+    }
     lastBomb = now
   }
 
@@ -244,7 +259,7 @@ function update() {
           xpOrbs.push({ x: ex, y: ey, size: 4, vx: 0, vy: 0 })
         }
       }
-      effects.push({ type: 'boom', x: m.x, y: m.y, ttl: 20 })
+      effects.push({ type: 'boom', x: m.x, y: m.y, ttl: 20, r: bombRange })
       bombs.splice(i, 1)
     }
   }
@@ -343,7 +358,16 @@ function draw() {
     const ef = effects[i]
     const sx = ef.x - camX
     const sy = ef.y - camY
-    ctx.value.fillText(ef.type === 'slash' ? '🔪' : '💥', sx, sy)
+    if (ef.type === 'slash') {
+      ctx.value.fillText('🔪', sx, sy)
+    } else {
+      ctx.value.save()
+      ctx.value.font = ef.r * 2 + 'px sans-serif'
+      ctx.value.textAlign = 'center'
+      ctx.value.textBaseline = 'middle'
+      ctx.value.fillText('💥', sx, sy)
+      ctx.value.restore()
+    }
     ef.ttl--
     if (ef.ttl <= 0) effects.splice(i, 1)
   }
@@ -370,6 +394,7 @@ function restart() {
   expToNext = 5
   bulletInterval = 500
   knifeDamage = 10
+  knifeRange = 50
   flamePierce = 1
   bombRange = 40
   hasKnife.value = false
