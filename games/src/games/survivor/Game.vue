@@ -34,30 +34,62 @@
         <button @click="currentTree = 'flame'">🔥</button>
         <button @click="currentTree = 'bomb'">💣</button>
       </div>
-      <div v-if="currentTree === 'bullet'" class="skill-page">
-        <div v-if="!bulletSkills.fireRate && !bulletSkills.speed">
-          <button @click="selectFireRate" :disabled="skillPoints <= 0">射击频率</button>
-          <button @click="selectSpeed" :disabled="skillPoints <= 0">射击速度</button>
-        </div>
-        <div v-else-if="bulletSkills.fireRate">
-          <div v-if="!bulletSkills.shotgun">
-            <button @click="unlockShotgun" :disabled="skillPoints <= 0">散弹枪</button>
+      <div v-if="currentTree === 'bullet'" class="tree">
+        <svg class="tree-lines" viewBox="0 0 300 200">
+          <line x1="150" y1="30" x2="50" y2="70" stroke="#000" />
+          <line x1="150" y1="30" x2="150" y2="70" stroke="#000" />
+          <line x1="150" y1="30" x2="250" y2="70" stroke="#000" />
+          <line x1="50" y1="70" x2="50" y2="110" stroke="#000" />
+          <line x1="150" y1="70" x2="150" y2="110" stroke="#000" />
+          <line x1="250" y1="70" x2="250" y2="110" stroke="#000" />
+          <line x1="150" y1="110" x2="100" y2="150" stroke="#000" />
+          <line x1="150" y1="110" x2="200" y2="150" stroke="#000" />
+        </svg>
+        <div class="row">
+          <div class="node">
+            <button v-if="!bulletSkills.power" @click="unlockPower" :disabled="skillPoints <= 0">强力子弹</button>
+            <span v-else>强力子弹✓</span>
           </div>
         </div>
-        <div v-else-if="bulletSkills.speed">
-          <div v-if="!bulletSkills.fission">
-            <button @click="unlockFission" :disabled="skillPoints <= 0">裂变子弹</button>
+        <div class="row">
+          <div class="node">
+            <button v-if="bulletSkills.power && !bulletSkills.fireRate" @click="selectFireRate" :disabled="skillPoints <= 0">射击频率</button>
+            <span v-else-if="bulletSkills.fireRate">射击频率✓</span>
           </div>
-          <div v-else>
-            <button v-if="!bulletSkills.doubleFission && !bulletSkills.deathBullet" @click="unlockDoubleFission" :disabled="skillPoints <= 0">二次裂变</button>
-            <button v-if="!bulletSkills.doubleFission && !bulletSkills.deathBullet" @click="unlockDeathBullet" :disabled="skillPoints <= 0">死亡子弹</button>
+          <div class="node">
+            <button v-if="bulletSkills.power && !bulletSkills.speed" @click="selectSpeed" :disabled="skillPoints <= 0">子弹速度</button>
+            <span v-else-if="bulletSkills.speed">子弹速度✓</span>
+          </div>
+          <div class="node">
+            <button v-if="bulletSkills.power && !bulletSkills.vamp" @click="unlockVamp" :disabled="skillPoints <= 0">吸血弹</button>
+            <span v-else-if="bulletSkills.vamp">吸血弹✓</span>
           </div>
         </div>
-        <div class="common-path">
-          <button v-if="!bulletSkills.power" @click="unlockPower" :disabled="skillPoints <= 0">强力子弹</button>
-          <button v-else-if="!bulletSkills.vamp" @click="unlockVamp" :disabled="skillPoints <= 0">吸血子弹</button>
-          <button v-else-if="!bulletSkills.bend" @click="unlockBend" :disabled="skillPoints <= 0">拐弯子弹</button>
-          <span v-else>已全部解锁</span>
+        <div class="row">
+          <div class="node">
+            <button v-if="bulletSkills.fireRate && !bulletSkills.shotgun" @click="unlockShotgun" :disabled="skillPoints <= 0">散弹枪</button>
+            <span v-else-if="bulletSkills.shotgun">散弹枪✓</span>
+          </div>
+          <div class="node">
+            <button v-if="bulletSkills.speed && !bulletSkills.fission" @click="unlockFission" :disabled="skillPoints <= 0">裂变子弹</button>
+            <span v-else-if="bulletSkills.fission">裂变子弹✓</span>
+          </div>
+          <div class="node">
+            <button v-if="bulletSkills.vamp && !bulletSkills.bend" @click="unlockBend" :disabled="skillPoints <= 0">拐弯子弹</button>
+            <span v-else-if="bulletSkills.bend">拐弯子弹✓</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="node"></div>
+          <div class="node">
+            <button v-if="bulletSkills.fission && !bulletSkills.doubleFission && !bulletSkills.deathBullet" @click="unlockDoubleFission" :disabled="skillPoints <= 0">二次裂变</button>
+            <span v-else-if="bulletSkills.doubleFission">二次裂变✓</span>
+          </div>
+          <div class="node">
+            <button v-if="bulletSkills.fission && !bulletSkills.doubleFission && !bulletSkills.deathBullet" @click="unlockDeathBullet" :disabled="skillPoints <= 0">死亡子弹</button>
+            <span v-else-if="bulletSkills.deathBullet">死亡子弹✓</span>
+          </div>
+          <div class="node"></div>
         </div>
       </div>
       <div v-else class="skill-page">敬请期待</div>
@@ -72,7 +104,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, reactive } from 'vue'
+import { ref, onMounted, onUnmounted, reactive, watch } from 'vue'
 
 const canvasRef = ref(null)
 const ctx = ref(null)
@@ -151,11 +183,16 @@ const powerupTypes = [
 ]
 let lastPowerup = 0
 let playerShield = false
+let invulnUntil = 0
 let knifeInterval = 200
 
 const levelEmojis = ['🙂','😊','😄','😁','😆','😎']
 const playerEmoji = ref(levelEmojis[0])
 const gameOver = ref(false)
+
+watch(showSkillTree, v => {
+  paused = v || gameOver.value
+})
 
 // 敌人类型：普通、快速、血厚、走位
 const enemyTypes = [
@@ -419,8 +456,10 @@ function update() {
           }
         }
         effects.push({ type: 'shield', x: player.x, y: player.y, ttl: 20, r: 40 })
-      } else {
+      } else if (now > invulnUntil) {
         hp.value--
+        effects.push({ type: 'damage', x: player.x, y: player.y, ttl: 30, r: 10, text: '-1❤' })
+        invulnUntil = now + 1000
         if (hp.value <= 0) {
           playerEmoji.value = '😭'
           paused = true
@@ -698,7 +737,7 @@ function draw() {
   for (let i = effects.length - 1; i >= 0; i--) {
     const ef = effects[i]
     const sx = ef.x - camX
-    const sy = ef.y - camY
+    const sy = ef.y - camY - (ef.type === 'damage' ? (30 - ef.ttl) * 0.5 : 0)
     ctx.value.save()
     ctx.value.font = ef.r * 2 + 'px sans-serif'
     ctx.value.textAlign = 'center'
@@ -709,6 +748,8 @@ function draw() {
       ctx.value.fillText('🛡️', sx, sy)
     } else if (ef.type === 'fall') {
       ctx.value.fillText('⬇️', sx, sy)
+    } else if (ef.type === 'damage') {
+      ctx.value.fillText(ef.text, sx, sy)
     } else {
       ctx.value.fillText('💥', sx, sy)
     }
@@ -747,6 +788,7 @@ function restart() {
   bulletSpeed = 4
   bulletDamage = 1
   playerShield = false
+  invulnUntil = 0
   knifeInterval = 200
   lastPowerup = Date.now()
   hasKnife.value = false
@@ -956,6 +998,45 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
+}
+
+.tree {
+  position: relative;
+  width: 300px;
+  height: 200px;
+}
+
+.tree-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.tree .row {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 10px;
+}
+
+.tree .row:first-child {
+  justify-content: center;
+}
+
+.node {
+  background: #fff;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 2px 4px;
+  min-width: 60px;
+  text-align: center;
+}
+
+.node:empty {
+  border: none;
+  background: transparent;
 }
 
 .weapon-levels {
