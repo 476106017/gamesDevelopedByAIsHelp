@@ -16,6 +16,7 @@ const ctx = ref(null)
 const player = { x: 200, y: 200, size: 10 }
 const bullets = []
 const enemies = []
+const keys = new Set()
 
 let lastSpawn = 0
 let lastShoot = 0
@@ -48,7 +49,16 @@ function update() {
   const now = Date.now()
   elapsed.value = now - startTime.value
 
-  if (now - lastSpawn > 1000) { spawnEnemy(); lastSpawn = now }
+  // 玩家移动
+  if (keys.has('ArrowUp')) player.y = Math.max(player.size, player.y - 3)
+  if (keys.has('ArrowDown')) player.y = Math.min(400 - player.size, player.y + 3)
+  if (keys.has('ArrowLeft')) player.x = Math.max(player.size, player.x - 3)
+  if (keys.has('ArrowRight')) player.x = Math.min(400 - player.size, player.x + 3)
+
+  // 根据存活时间调整刷怪速度
+  const spawnInterval = Math.max(200, 1000 - Math.floor(elapsed.value / 20))
+  if (now - lastSpawn > spawnInterval) { spawnEnemy(); lastSpawn = now }
+
   if (now - lastShoot > 500) { shoot(); lastShoot = now }
 
   enemies.forEach(e => {
@@ -121,21 +131,12 @@ function draw() {
   })
 }
 
-function handleKey(e) {
-  switch (e.key) {
-    case 'ArrowUp':
-      player.y = Math.max(player.size, player.y - 5)
-      break
-    case 'ArrowDown':
-      player.y = Math.min(400 - player.size, player.y + 5)
-      break
-    case 'ArrowLeft':
-      player.x = Math.max(player.size, player.x - 5)
-      break
-    case 'ArrowRight':
-      player.x = Math.min(400 - player.size, player.x + 5)
-      break
-  }
+function handleKeyDown(e) {
+  keys.add(e.key)
+}
+
+function handleKeyUp(e) {
+  keys.delete(e.key)
 }
 
 function restart() {
@@ -145,17 +146,20 @@ function restart() {
   player.x = 200
   player.y = 200
   startTime.value = Date.now()
+  keys.clear()
 }
 
 onMounted(() => {
   ctx.value = canvasRef.value.getContext('2d')
-  window.addEventListener('keydown', handleKey)
+  window.addEventListener('keydown', handleKeyDown)
+  window.addEventListener('keyup', handleKeyUp)
   restart()
   loop()
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKey)
+  window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('keyup', handleKeyUp)
   cancelAnimationFrame(animationFrameId)
 })
 </script>
