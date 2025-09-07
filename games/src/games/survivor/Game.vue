@@ -141,7 +141,13 @@ const levelEmojis = ['🙂','😊','😄','😁','😆','😎']
 const playerEmoji = ref(levelEmojis[0])
 const gameOver = ref(false)
 
-const enemyEmojis = ['👾', '👹', '👻', '🤖', '👺']
+// 敌人类型：普通、快速、血厚、走位
+const enemyTypes = [
+  { emoji: '👾', speed: 0.6, hp: 1, size: 10 },
+  { emoji: '👻', speed: 1.2, hp: 1, size: 10 },
+  { emoji: '👹', speed: 0.5, hp: 4, size: 16 },
+  { emoji: '🤖', speed: 0.8, hp: 2, size: 12, dodge: true },
+]
 
 function generateBackground() {
   backgrounds.length = 0
@@ -175,12 +181,33 @@ function spawnEnemy() {
   else if (side === 1) { x = camX + width.value + 20; y = camY + Math.random() * height.value }
   else if (side === 2) { x = camX + Math.random() * width.value; y = camY - 20 }
   else { x = camX + Math.random() * width.value; y = camY + height.value + 20 }
-  // 每 15 秒提升敌人类型，血量与速度随阶段增加
-  const stage = Math.floor(elapsed.value / 15000)
-  const hp = 1 + stage
-  const speed = 0.5 + stage * 0.2
-  const emoji = enemyEmojis[Math.min(stage, enemyEmojis.length - 1)]
-  enemies.push({ x, y, size: 10, hp, maxHp: hp, speed, emoji, freeze: 0, vy: 0, isFalling: false, fallTime: 0 })
+
+  const wave = Math.floor(elapsed.value / 15000) + 1
+  let typeCount
+  if (wave < 3) typeCount = 1
+  else if (wave < 6) typeCount = 2
+  else if (wave < 9) typeCount = 3
+  else typeCount = 4
+  typeCount = Math.min(typeCount, enemyTypes.length)
+  const type = enemyTypes[Math.floor(Math.random() * typeCount)]
+  const stage = wave - 1
+  const hp = type.hp + stage
+  enemies.push({
+    x,
+    y,
+    size: type.size,
+    hp,
+    maxHp: hp,
+    speed: type.speed,
+    emoji: type.emoji,
+    dodge: !!type.dodge,
+    dodgeDir: 0,
+    dodgeTime: 0,
+    freeze: 0,
+    vy: 0,
+    isFalling: false,
+    fallTime: 0,
+  })
 }
 
 function getNearestEnemy(fromX = player.x, fromY = player.y) {
@@ -290,20 +317,30 @@ function update() {
       if (e.fallTime <= 0) e.isFalling = false
       return
     }
-    const dx = player.x - e.x
-    const dy = player.y - e.y
-    const len = Math.hypot(dx, dy)
-    e.x += (dx / len) * e.speed
-    e.y += (dy / len) * e.speed
+    if (e.dodgeTime > 0) {
+      e.x += Math.cos(e.dodgeDir) * e.speed
+      e.y += Math.sin(e.dodgeDir) * e.speed
+      e.dodgeTime--
+    } else {
+      const dx = player.x - e.x
+      const dy = player.y - e.y
+      const len = Math.hypot(dx, dy)
+      if (len > 0) {
+        e.x += (dx / len) * e.speed
+        e.y += (dy / len) * e.speed
+      }
+      if (e.dodge && Math.random() < 0.02) {
+        e.dodgeTime = 30
+        e.dodgeDir = Math.random() * Math.PI * 2
+      }
+    }
   })
 
-  // 坠落敌人之间的碰撞
+  // 敌人之间的碰撞
   for (let i = 0; i < enemies.length; i++) {
-    const e1 = enemies[i]
-    if (!e1.isFalling) continue
     for (let j = i + 1; j < enemies.length; j++) {
+      const e1 = enemies[i]
       const e2 = enemies[j]
-      if (!e2.isFalling) continue
       const dx = e2.x - e1.x
       const dy = e2.y - e1.y
       const dist = Math.hypot(dx, dy)
@@ -323,6 +360,7 @@ function update() {
   // 敌人碰撞玩家
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i]
+    if (e.isFalling) continue
     if (Math.hypot(e.x - player.x, e.y - player.y) < e.size + player.size) {
       if (playerShield) {
         playerShield = false
@@ -399,14 +437,13 @@ function update() {
     m.vx *= 0.98
     m.vy *= 0.98
     if (bombLevel.value >= 3) {
-      const { enemy: target } = getNearestEnemy(m.x, m.y)
-      if (target) {
-        const dx = m.x - target.x
-        const dy = m.y - target.y
+      for (const e of enemies) {
+        const dx = m.x - e.x
+        const dy = m.y - e.y
         const dist = Math.hypot(dx, dy)
-        if (dist > 1) {
-          target.x += dx / dist * 0.5
-          target.y += dy / dist * 0.5
+        if (dist < bombRange * 2 && dist > 1) {
+          e.x += dx / dist * 0.5
+          e.y += dy / dist * 0.5
         }
       }
     }
@@ -484,6 +521,7 @@ function update() {
           e.isFalling = true
           e.vy = 0
           e.fallTime = 180
+          effects.push({ type: 'fall', x: e.x, y: e.y, ttl: 30, r: 20 })
         })
       }
     }
@@ -580,6 +618,8 @@ function draw() {
       ctx.value.fillText('❄️', sx, sy)
     } else if (ef.type === 'shield') {
       ctx.value.fillText('🛡️', sx, sy)
+    } else if (ef.type === 'fall') {
+      ctx.value.fillText('⬇️', sx, sy)
     } else {
       ctx.value.fillText('💥', sx, sy)
     }
