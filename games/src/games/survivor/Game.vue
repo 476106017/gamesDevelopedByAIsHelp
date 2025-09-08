@@ -82,12 +82,12 @@
         <div class="row">
           <div class="node"></div>
           <div class="node">
-            <button v-if="!bulletSkills.doubleFission && !bulletSkills.deathBullet" @click="unlockDoubleFission" :disabled="skillPoints <= 0 || !bulletSkills.fission">二次弹射</button>
-            <span v-else-if="bulletSkills.doubleFission">二次弹射✓</span>
+            <button v-if="!bulletSkills.doubleFission" @click="unlockDoubleFission" :disabled="skillPoints <= 0 || !bulletSkills.fission">二次弹射</button>
+            <span v-else>二次弹射✓</span>
           </div>
           <div class="node">
-            <button v-if="!bulletSkills.deathBullet && !bulletSkills.doubleFission" @click="unlockDeathBullet" :disabled="skillPoints <= 0 || !bulletSkills.fission">死亡子弹</button>
-            <span v-else-if="bulletSkills.deathBullet">死亡子弹✓</span>
+            <button v-if="!bulletSkills.dualFission" @click="unlockDualFission" :disabled="skillPoints <= 0 || !bulletSkills.fission">双重弹射</button>
+            <span v-else>双重弹射✓</span>
           </div>
           <div class="node"></div>
         </div>
@@ -158,7 +158,7 @@ const bulletSkills = reactive({
   shotgun: false,
   fission: false,
   doubleFission: false,
-  deathBullet: false,
+  dualFission: false,
   power: false,
   vamp: false,
   bend: false,
@@ -263,12 +263,13 @@ function spawnEnemy() {
   })
 }
 
-function getNearestEnemy(fromX = player.x, fromY = player.y, excludeIndex = -1) {
+function getNearestEnemy(fromX = player.x, fromY = player.y, exclude = -1) {
+  const excludeSet = exclude instanceof Set ? exclude : new Set([exclude])
   let nearest = null
   let minDist = Infinity
   let index = -1
   for (let i = 0; i < enemies.length; i++) {
-    if (i === excludeIndex) continue
+    if (excludeSet.has(i)) continue
     const e = enemies[i]
     const d = Math.hypot(e.x - fromX, e.y - fromY)
     if (d < minDist) {
@@ -300,7 +301,7 @@ function shoot() {
         damage: Math.max(1, bulletDamage - 1),
         life: 30,
         depth: 0,
-        death: bulletSkills.deathBullet,
+        dual: bulletSkills.dualFission,
         fission: bulletSkills.fission,
       })
     }
@@ -313,7 +314,7 @@ function shoot() {
       size: 4,
       damage: bulletDamage,
       depth: 0,
-      death: bulletSkills.deathBullet,
+      dual: bulletSkills.dualFission,
       fission: bulletSkills.fission,
     })
   }
@@ -591,14 +592,18 @@ function update() {
         if (bulletSkills.vamp && killed) {
           hp.value = Math.min(maxHp.value, hp.value + 1)
         }
-        if ((b.fission || bulletSkills.fission) && (!b.death || killed)) {
+        if (b.fission || bulletSkills.fission) {
           const maxDepth = bulletSkills.doubleFission ? 2 : 1
           const depth = b.depth || 0
           if (depth < maxDepth) {
             const originX = e.x
             const originY = e.y
-            const { enemy: next } = getNearestEnemy(originX, originY, i)
-            if (next) {
+            const exclude = killed ? new Set() : new Set([i])
+            const splitCount = b.dual || bulletSkills.dualFission ? 2 : 1
+            for (let k = 0; k < splitCount; k++) {
+              const { enemy: next, index: ni } = getNearestEnemy(originX, originY, exclude)
+              if (!next) break
+              exclude.add(ni)
               const dx2 = next.x - originX
               const dy2 = next.y - originY
               const len2 = Math.hypot(dx2, dy2)
@@ -610,7 +615,7 @@ function update() {
                 size: 4,
                 damage: bulletDamage,
                 depth: depth + 1,
-                death: b.death,
+                dual: b.dual,
                 fission: true,
               })
             }
@@ -881,9 +886,9 @@ function unlockDoubleFission() {
   })
 }
 
-function unlockDeathBullet() {
+function unlockDualFission() {
   spendPoint(() => {
-    bulletSkills.deathBullet = true
+    bulletSkills.dualFission = true
   })
 }
 
