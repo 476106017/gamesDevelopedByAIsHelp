@@ -50,6 +50,19 @@ const BULLET_SPEED = 0.3
 const enemies = []
 const bullets = []
 
+function createEmojiTexture(char) {
+  const canvas = document.createElement('canvas')
+  canvas.width = 64
+  canvas.height = 64
+  const ctx = canvas.getContext('2d')
+  ctx.font = '48px serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(char, 32, 32)
+  const texture = new THREE.CanvasTexture(canvas)
+  return texture
+}
+
 onMounted(() => {
   const width = window.innerWidth
   const height = window.innerHeight
@@ -69,13 +82,13 @@ onMounted(() => {
   ground.rotation.x = -Math.PI / 2
   scene.add(ground)
 
-  const playerGeo = new THREE.BoxGeometry(1, 2, 1)
-  const playerMat = new THREE.MeshBasicMaterial({ color: 0xffff00 })
-  player = new THREE.Mesh(playerGeo, playerMat)
+  const playerMat = new THREE.SpriteMaterial({ map: createEmojiTexture('😀'), transparent: true })
+  player = new THREE.Sprite(playerMat)
+  player.scale.set(0.5, 0.5, 1)
   player.position.y = 1
   scene.add(player)
 
-  camera.position.set(0, 5, 10)
+  camera.position.set(0, 10, 0.1)
   camera.lookAt(player.position)
 
   window.addEventListener('resize', onResize)
@@ -114,9 +127,9 @@ function onKeyUp(e) {
 }
 
 function spawnEnemy() {
-  const geo = new THREE.BoxGeometry(1, 2, 1)
-  const mat = new THREE.MeshBasicMaterial({ color: 0xff0000 })
-  const enemy = new THREE.Mesh(geo, mat)
+  const mat = new THREE.SpriteMaterial({ map: createEmojiTexture('👾'), transparent: true })
+  const enemy = new THREE.Sprite(mat)
+  enemy.scale.set(0.4, 0.4, 1)
   enemy.position.set((Math.random() - 0.5) * 40, 1, (Math.random() - 0.5) * 40)
   enemy.hp = 1
   scene.add(enemy)
@@ -130,9 +143,9 @@ function getNearestEnemies(pos, exclude = new Set(), count = 1) {
 }
 
 function createBullet(pos, target, bouncesLeft, exclude) {
-  const geo = new THREE.SphereGeometry(0.2, 8, 8)
-  const mat = new THREE.MeshBasicMaterial({ color: 0x000000 })
-  const b = new THREE.Mesh(geo, mat)
+  const mat = new THREE.SpriteMaterial({ map: createEmojiTexture('•'), transparent: true })
+  const b = new THREE.Sprite(mat)
+  b.scale.set(0.2, 0.2, 1)
   b.position.copy(pos)
   b.position.y = 1
   b.target = target
@@ -166,7 +179,7 @@ function update() {
   dir.normalize().multiplyScalar(SPEED)
   player.position.add(dir)
 
-  camera.position.set(player.position.x, player.position.y + 4, player.position.z + 8)
+  camera.position.set(player.position.x, player.position.y + 10, player.position.z + 0.1)
   camera.lookAt(player.position)
 
   // enemies move toward player
