@@ -1,6 +1,7 @@
 <template>
   <div ref="container" class="three-game"></div>
   <div class="hud">
+    <div class="hp">❤ {{ playerHp }}</div>
     <button class="skill-btn" @click="toggleTree">技能树({{ skillPoints }})</button>
   </div>
   <div v-if="showTree" class="skill-tree">
@@ -19,6 +20,7 @@ import * as THREE from 'https://unpkg.com/three@0.155.0/build/three.module.js'
 const container = ref(null)
 const showTree = ref(false)
 const skillPoints = ref(99)
+const playerHp = ref(3)
 const skills = ref({
   bounce: false,
   doubleBounce: false,
@@ -47,6 +49,8 @@ let animId, shootTimer, spawnTimer
 const keys = new Set()
 const SPEED = 0.1
 const BULLET_SPEED = 0.3
+let playerAngle = 0
+const ROTATE_SPEED = 0.05
 const enemies = []
 const bullets = []
 const enemyEmojis = ['👾', '😈', '👻', '💀']
@@ -105,7 +109,7 @@ onMounted(() => {
   window.addEventListener('keyup', onKeyUp)
 
   spawnEnemy()
-  spawnTimer = setInterval(spawnEnemy, 2000)
+  spawnTimer = setInterval(spawnEnemy, 1000)
   shootTimer = setInterval(shoot, 600)
 
   animate()
@@ -193,24 +197,35 @@ function animate() {
 }
 
 function update() {
+  const forward = new THREE.Vector3(0, 0, -1)
+    .applyAxisAngle(new THREE.Vector3(0, 1, 0), playerAngle)
   const dir = new THREE.Vector3()
-  if (keys.has('w')) dir.z -= 1
-  if (keys.has('s')) dir.z += 1
-  if (keys.has('a')) dir.x -= 1
-  if (keys.has('d')) dir.x += 1
+  if (keys.has('w') || keys.has('arrowup')) dir.add(forward)
+  if (keys.has('s') || keys.has('arrowdown')) dir.add(forward.clone().negate())
   dir.normalize().multiplyScalar(SPEED)
   player.position.add(dir)
 
-  camera.position.set(player.position.x, player.position.y + 5, player.position.z + 10)
+  if (keys.has('a') || keys.has('arrowleft')) playerAngle += ROTATE_SPEED
+  if (keys.has('d') || keys.has('arrowright')) playerAngle -= ROTATE_SPEED
+
+  const offset = new THREE.Vector3(0, 5, 10)
+    .applyAxisAngle(new THREE.Vector3(0, 1, 0), playerAngle)
+  camera.position.copy(player.position).add(offset)
   camera.lookAt(player.position)
 
-  // enemies move toward player
-  enemies.forEach(e => {
+  // enemies move toward player and check collision
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i]
     const v = player.position.clone().sub(e.position)
     v.y = 0
     v.normalize().multiplyScalar(0.02)
     e.position.add(v)
-  })
+    if (e.position.distanceTo(player.position) < 1) {
+      playerHp.value -= 1
+      scene.remove(e)
+      enemies.splice(i, 1)
+    }
+  }
 
   // bullet movement and collision
   for (let i = bullets.length - 1; i >= 0; i--) {
@@ -274,6 +289,10 @@ function toggleTree() {
   left: 10px;
   bottom: 10px;
   z-index: 10;
+}
+
+.hp {
+  margin-bottom: 4px;
 }
 
 .skill-btn {
