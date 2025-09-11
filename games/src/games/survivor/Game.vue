@@ -49,6 +49,8 @@ const SPEED = 0.1
 const BULLET_SPEED = 0.3
 const enemies = []
 const bullets = []
+const enemyEmojis = ['👾', '😈', '👻', '💀']
+const envEmojis = ['🌲', '🌳', '🌴', '🌵', '🌼', '🌻', '🍄', '🌿']
 
 function createEmojiTexture(char) {
   const canvas = document.createElement('canvas')
@@ -82,6 +84,8 @@ onMounted(() => {
   ground.rotation.x = -Math.PI / 2
   scene.add(ground)
 
+  addEnvironment()
+
   const playerMat = new THREE.SpriteMaterial({ map: createEmojiTexture('😀'), transparent: true })
   player = new THREE.Sprite(playerMat)
   player.scale.set(0.5, 0.5, 1)
@@ -95,6 +99,7 @@ onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
 
+  spawnEnemy()
   spawnTimer = setInterval(spawnEnemy, 2000)
   shootTimer = setInterval(shoot, 600)
 
@@ -127,13 +132,25 @@ function onKeyUp(e) {
 }
 
 function spawnEnemy() {
-  const mat = new THREE.SpriteMaterial({ map: createEmojiTexture('👾'), transparent: true })
+  const emoji = enemyEmojis[Math.floor(Math.random() * enemyEmojis.length)]
+  const mat = new THREE.SpriteMaterial({ map: createEmojiTexture(emoji), transparent: true })
   const enemy = new THREE.Sprite(mat)
   enemy.scale.set(0.4, 0.4, 1)
   enemy.position.set((Math.random() - 0.5) * 40, 1, (Math.random() - 0.5) * 40)
   enemy.hp = 1
   scene.add(enemy)
   enemies.push(enemy)
+}
+
+function addEnvironment() {
+  for (let i = 0; i < 60; i++) {
+    const emoji = envEmojis[Math.floor(Math.random() * envEmojis.length)]
+    const mat = new THREE.SpriteMaterial({ map: createEmojiTexture(emoji), transparent: true })
+    const sprite = new THREE.Sprite(mat)
+    sprite.scale.set(0.5, 0.5, 1)
+    sprite.position.set((Math.random() - 0.5) * 180, 1, (Math.random() - 0.5) * 180)
+    scene.add(sprite)
+  }
 }
 
 function getNearestEnemies(pos, exclude = new Set(), count = 1) {
@@ -249,8 +266,8 @@ function toggleTree() {
 
 .hud {
   position: fixed;
-  top: 10px;
   left: 10px;
+  bottom: 10px;
   z-index: 10;
 }
 
