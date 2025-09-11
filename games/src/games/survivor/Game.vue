@@ -109,7 +109,8 @@ onMounted(() => {
   window.addEventListener('keyup', onKeyUp)
 
   spawnEnemy()
-  spawnTimer = setInterval(spawnEnemy, 1000)
+  // 缩短刷怪间隔，加快敌人出现速度
+  spawnTimer = setInterval(spawnEnemy, 500)
   shootTimer = setInterval(shoot, 600)
 
   animate()
@@ -145,7 +146,13 @@ function spawnEnemy() {
   const mat = new THREE.SpriteMaterial({ map: createEmojiTexture(emoji), transparent: true })
   const enemy = new THREE.Sprite(mat)
   enemy.scale.set(0.4, 0.4, 1)
-  enemy.position.set((Math.random() - 0.5) * 40, 1, (Math.random() - 0.5) * 40)
+  let x, z
+  // 保证刷新点远离玩家，避免直接出现在视野中
+  do {
+    x = (Math.random() - 0.5) * 180
+    z = (Math.random() - 0.5) * 180
+  } while (new THREE.Vector3(x, 0, z).distanceTo(player.position) < 40)
+  enemy.position.set(x, 1, z)
   enemy.hp = 1
   scene.add(enemy)
   enemies.push(enemy)
