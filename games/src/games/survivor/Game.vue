@@ -73,16 +73,22 @@ onMounted(() => {
   scene.background = new THREE.Color(0xa0d0ff)
 
   camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000)
+  camera.position.set(0, 5, 10)
 
   renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setSize(width, height)
   container.value.appendChild(renderer.domElement)
 
   const groundGeo = new THREE.PlaneGeometry(200, 200)
-  const groundMat = new THREE.MeshBasicMaterial({ color: 0x55aa55 })
+  const groundMat = new THREE.MeshLambertMaterial({ color: 0x55aa55 })
   const ground = new THREE.Mesh(groundGeo, groundMat)
   ground.rotation.x = -Math.PI / 2
   scene.add(ground)
+
+  const light = new THREE.DirectionalLight(0xffffff, 0.8)
+  light.position.set(0, 20, 10)
+  scene.add(light)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.4))
 
   addEnvironment()
 
@@ -92,7 +98,6 @@ onMounted(() => {
   player.position.y = 1
   scene.add(player)
 
-  camera.position.set(0, 10, 0.1)
   camera.lookAt(player.position)
 
   window.addEventListener('resize', onResize)
@@ -160,9 +165,9 @@ function getNearestEnemies(pos, exclude = new Set(), count = 1) {
 }
 
 function createBullet(pos, target, bouncesLeft, exclude) {
-  const mat = new THREE.SpriteMaterial({ map: createEmojiTexture('•'), transparent: true })
+  const mat = new THREE.SpriteMaterial({ map: createEmojiTexture('🔵'), transparent: true })
   const b = new THREE.Sprite(mat)
-  b.scale.set(0.2, 0.2, 1)
+  b.scale.set(0.3, 0.3, 1)
   b.position.copy(pos)
   b.position.y = 1
   b.target = target
@@ -196,7 +201,7 @@ function update() {
   dir.normalize().multiplyScalar(SPEED)
   player.position.add(dir)
 
-  camera.position.set(player.position.x, player.position.y + 10, player.position.z + 0.1)
+  camera.position.set(player.position.x, player.position.y + 5, player.position.z + 10)
   camera.lookAt(player.position)
 
   // enemies move toward player
