@@ -8,7 +8,12 @@
           class="game-item"
           @click="goToGame(game.name)"
       >
-        <img :src="game.thumbnail" :alt="$t('games.' + game.name)" />
+        <img
+            v-if="game.thumbnail"
+            :src="game.thumbnail"
+            :alt="$t('games.' + game.name)"
+        />
+        <div v-else class="placeholder"></div>
         <p>{{ $t('games.' + game.name) }}</p>
       </div>
     </div>
@@ -57,6 +62,13 @@ const goToGame = (name) => {
 .game-item img {
   width: 100%;
   height: auto;
+  border-radius: 4px;
+}
+
+.placeholder {
+  width: 100%;
+  aspect-ratio: 1/1;
+  background-color: #eee;
   border-radius: 4px;
 }
 </style>
