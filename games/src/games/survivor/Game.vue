@@ -1,5 +1,13 @@
 <template>
   <div ref="container" class="three-game"></div>
+  <div class="hud">
+    <button class="skill-btn" @click="toggleTree">技能树</button>
+  </div>
+  <div v-if="showTree" class="skill-tree">
+    <div class="node" v-for="n in nodes" :key="n.id">
+      {{ n.label }}
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -7,6 +15,13 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import * as THREE from 'https://unpkg.com/three@0.155.0/build/three.module.js'
 
 const container = ref(null)
+const showTree = ref(false)
+const nodes = ref([
+  { id: 1, label: '基础攻击' },
+  { id: 2, label: '强化子弹' },
+  { id: 3, label: '强化近战' }
+])
+
 let scene, camera, renderer, player
 let animId
 const keys = new Set()
@@ -90,6 +105,10 @@ function update() {
   camera.position.set(player.position.x, player.position.y + 4, player.position.z + 8)
   camera.lookAt(player.position)
 }
+
+function toggleTree() {
+  showTree.value = !showTree.value
+}
 </script>
 
 <style>
@@ -97,6 +116,32 @@ function update() {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+}
+
+.hud {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+}
+
+.skill-btn {
+  padding: 4px 8px;
+}
+
+.skill-tree {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 16px;
+  border: 1px solid #ccc;
+  z-index: 20;
+}
+
+.node {
+  margin: 4px 0;
 }
 </style>
 
