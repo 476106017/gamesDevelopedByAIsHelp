@@ -2,7 +2,10 @@
   <div class="game-wrapper">
     <div ref="container" class="game-container"></div>
     <div v-if="gameOver" class="overlay">
-      <p>Game Over</p>
+      <div class="game-over">
+        <p>Game Over</p>
+        <button @click="restart">Restart</button>
+      </div>
     </div>
   </div>
 </template>
@@ -54,12 +57,14 @@ function init() {
   renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setSize(container.value.clientWidth, container.value.clientHeight)
   renderer.setClearColor(0x87ceeb)
+  renderer.shadowMap.enabled = true
   container.value.appendChild(renderer.domElement)
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.6)
   scene.add(ambient)
   const dir = new THREE.DirectionalLight(0xffffff, 0.8)
   dir.position.set(0, 20, 10)
+  dir.castShadow = true
   scene.add(dir)
 
   const groundGeo = new THREE.PlaneGeometry(1000, 100000)
@@ -67,6 +72,7 @@ function init() {
   ground = new THREE.Mesh(groundGeo, groundMat)
   ground.rotation.x = -slopeAngle
   ground.position.y = -5
+  ground.receiveShadow = true
   scene.add(ground)
 
   const skyGeo = new THREE.SphereGeometry(5000, 16, 16)
@@ -77,6 +83,8 @@ function init() {
   const playerGeo = new THREE.SphereGeometry(playerRadius, 32, 32)
   const playerMat = new THREE.MeshStandardMaterial({ color: 0xff0000 })
   player = new THREE.Mesh(playerGeo, playerMat)
+  player.castShadow = true
+  player.receiveShadow = true
   scene.add(player)
 
   window.addEventListener('keydown', onKeyDown)
@@ -106,14 +114,25 @@ function onKeyUp(e) {
 function spawnObstacle(dist, radius) {
   radius = radius || 0.5 + Math.random() * 2
   const geo = new THREE.SphereGeometry(radius, 16, 16)
-  const mat = new THREE.MeshStandardMaterial({ color: 0x00ff00 })
+  const color = new THREE.Color().setHSL(Math.random(), 0.7, 0.5)
+  const mat = new THREE.MeshStandardMaterial({ color })
   const mesh = new THREE.Mesh(geo, mat)
+  mesh.castShadow = true
+  mesh.receiveShadow = true
   const x = (Math.random() - 0.5) * 20
   const z = -dist * Math.cos(slopeAngle)
   const y = dist * Math.sin(slopeAngle)
   mesh.position.set(x, y + radius, z)
+  const speed = 2 + Math.random() * 3
+  const theta = Math.random() * Math.PI * 2
+  const phi = Math.random() * Math.PI - Math.PI / 2
+  const velocity = new THREE.Vector3(
+    speed * Math.cos(phi) * Math.cos(theta),
+    speed * Math.sin(phi),
+    speed * Math.cos(phi) * Math.sin(theta)
+  )
   scene.add(mesh)
-  obstacles.push({ mesh, radius, x, dist })
+  obstacles.push({ mesh, radius, velocity })
 }
 
 function animate() {
@@ -139,8 +158,9 @@ function animate() {
   const y = player.userData.dist * Math.sin(slopeAngle)
   player.position.set(player.userData.x, y + playerRadius, z)
 
-  camera.position.set(player.userData.x, y + 2, z + 10)
-  camera.lookAt(player.position)
+  camera.position.set(player.userData.x, y + 3, z + 12)
+  const lookAt = player.position.clone().add(new THREE.Vector3(0, 5, -20))
+  camera.lookAt(lookAt)
   ground.position.z = z
   sky.position.set(player.position.x, player.position.y, player.position.z)
 
@@ -150,21 +170,58 @@ function animate() {
     nextSpawnDist += 10 + Math.random() * 10
   }
 
+  for (const o of obstacles) {
+    o.mesh.position.addScaledVector(o.velocity, delta)
+  }
+
+  for (let i = 0; i < obstacles.length; i++) {
+    const o1 = obstacles[i]
+    for (let j = i + 1; j < obstacles.length; j++) {
+      const o2 = obstacles[j]
+      const p1 = o1.mesh.position
+      const p2 = o2.mesh.position
+      const dx = p2.x - p1.x
+      const dy = p2.y - p1.y
+      const dz = p2.z - p1.z
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+      const minDist = o1.radius + o2.radius
+      if (dist < minDist) {
+        const nx = dx / dist
+        const ny = dy / dist
+        const nz = dz / dist
+        const overlap = minDist - dist
+        p1.x -= nx * overlap / 2
+        p1.y -= ny * overlap / 2
+        p1.z -= nz * overlap / 2
+        p2.x += nx * overlap / 2
+        p2.y += ny * overlap / 2
+        p2.z += nz * overlap / 2
+        const v1n = o1.velocity.x * nx + o1.velocity.y * ny + o1.velocity.z * nz
+        const v2n = o2.velocity.x * nx + o2.velocity.y * ny + o2.velocity.z * nz
+        const diff = v1n - v2n
+        o1.velocity.x -= diff * nx
+        o1.velocity.y -= diff * ny
+        o1.velocity.z -= diff * nz
+        o2.velocity.x += diff * nx
+        o2.velocity.y += diff * ny
+        o2.velocity.z += diff * nz
+      }
+    }
+  }
+
   for (let i = obstacles.length - 1; i >= 0; i--) {
     const o = obstacles[i]
-    const oz = -o.dist * Math.cos(slopeAngle)
-    const oy = o.dist * Math.sin(slopeAngle)
-    o.mesh.position.set(o.x, oy + o.radius, oz)
-
-    if (o.dist < player.userData.dist - 20) {
+    const p = o.mesh.position
+    if (p.z > player.position.z + 20) {
       scene.remove(o.mesh)
       obstacles.splice(i, 1)
       continue
     }
 
-    const dx = player.userData.x - o.x
-    const dd = player.userData.dist - o.dist
-    const distance = Math.sqrt(dx * dx + dd * dd)
+    const dx = player.position.x - p.x
+    const dy = player.position.y - p.y
+    const dz = player.position.z - p.z
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
     if (distance < playerRadius + o.radius) {
       if (o.radius > playerRadius) {
         gameOver.value = true
@@ -179,6 +236,22 @@ function animate() {
   }
 
   renderer.render(scene, camera)
+}
+
+function restart() {
+  obstacles.forEach(o => scene.remove(o.mesh))
+  obstacles = []
+  playerRadius = 1
+  player.geometry.dispose()
+  player.geometry = new THREE.SphereGeometry(playerRadius, 32, 32)
+  player.userData.dist = 0
+  player.userData.x = 0
+  downSpeed = 0
+  sideSpeed = 0
+  nextSpawnDist = 20
+  gameOver.value = false
+  lastTime = performance.now()
+  animate()
 }
 
 onMounted(() => {
@@ -213,5 +286,13 @@ onBeforeUnmount(() => {
   justify-content: center;
   color: #fff;
   font-size: 2rem;
+}
+.game-over {
+  text-align: center;
+}
+.game-over button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
 }
 </style>
