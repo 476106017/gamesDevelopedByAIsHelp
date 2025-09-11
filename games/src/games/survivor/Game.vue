@@ -150,7 +150,7 @@ const hasKnife = ref(false)
 const hasFlame = ref(false)
 const hasBomb = ref(false)
 const showSkillTree = ref(false)
-const skillPoints = ref(0)
+const skillPoints = ref(99)
 const currentTree = ref('bullet')
 const bulletSkills = reactive({
   fireRate: false,
@@ -481,20 +481,14 @@ function update() {
     const b = bullets[i]
     b.x += b.vx
     b.y += b.vy
-    if (bulletSkills.bend && !b.homed) {
-      for (const bg of backgrounds) {
-        if (Math.hypot(bg.x - b.x, bg.y - b.y) < 8) {
-          const { enemy: t } = getNearestEnemy(b.x, b.y)
-          if (t) {
-            const dx2 = t.x - b.x
-            const dy2 = t.y - b.y
-            const len2 = Math.hypot(dx2, dy2)
-            b.vx = dx2 / len2 * bulletSpeed
-            b.vy = dy2 / len2 * bulletSpeed
-            b.homed = true
-          }
-          break
-        }
+    if (bulletSkills.bend) {
+      const { enemy: t } = getNearestEnemy(b.x, b.y)
+      if (t) {
+        const dx2 = t.x - b.x
+        const dy2 = t.y - b.y
+        const len2 = Math.hypot(dx2, dy2)
+        b.vx = dx2 / len2 * bulletSpeed
+        b.vy = dy2 / len2 * bulletSpeed
       }
     }
     if (b.life !== undefined) {
@@ -598,6 +592,7 @@ function update() {
           if (depth < maxDepth) {
             const originX = e.x
             const originY = e.y
+            const originSize = e.size
             const exclude = killed ? new Set() : new Set([i])
             const splitCount = b.dual || bulletSkills.dualFission ? 2 : 1
             for (let k = 0; k < splitCount; k++) {
@@ -608,8 +603,8 @@ function update() {
               const dy2 = next.y - originY
               const len2 = Math.hypot(dx2, dy2)
               bullets.push({
-                x: originX,
-                y: originY,
+                x: originX + dx2 / len2 * (originSize + 2),
+                y: originY + dy2 / len2 * (originSize + 2),
                 vx: dx2 / len2 * bulletSpeed,
                 vy: dy2 / len2 * bulletSpeed,
                 size: 4,
@@ -804,7 +799,7 @@ function restart() {
   hasFlame.value = false
   hasBomb.value = false
   hp.value = maxHp.value
-  skillPoints.value = 0
+  skillPoints.value = 99
   Object.keys(bulletSkills).forEach(k => bulletSkills[k] = false)
   bulletLevel.value = 1
   knifeLevel.value = 0
