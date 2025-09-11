@@ -26,11 +26,15 @@ let lastTime = 0
 const slopeAngle = Math.PI / 6
 let nextSpawnDist = 20
 
-function createEmojiTexture(emoji) {
+function createEmojiTexture(emoji, bg) {
   const size = 64
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = size
   const ctx = canvas.getContext('2d')
+  if (bg) {
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, size, size)
+  }
   ctx.font = `${size * 0.8}px serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
@@ -45,10 +49,11 @@ function init() {
   scene = new THREE.Scene()
 
   camera = new THREE.PerspectiveCamera(60, container.value.clientWidth / container.value.clientHeight, 0.1, 1000)
-  camera.position.set(0, 5, 10)
+  camera.position.set(0, 3, 10)
 
   renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setSize(container.value.clientWidth, container.value.clientHeight)
+  renderer.setClearColor(0x87ceeb)
   container.value.appendChild(renderer.domElement)
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.6)
@@ -58,14 +63,14 @@ function init() {
   scene.add(dir)
 
   const groundGeo = new THREE.PlaneGeometry(1000, 100000)
-  const groundMat = new THREE.MeshStandardMaterial({ map: createEmojiTexture('🌿') })
+  const groundMat = new THREE.MeshStandardMaterial({ map: createEmojiTexture('🌿', '#228b22') })
   ground = new THREE.Mesh(groundGeo, groundMat)
   ground.rotation.x = -slopeAngle
   ground.position.y = -5
   scene.add(ground)
 
   const skyGeo = new THREE.SphereGeometry(5000, 16, 16)
-  const skyMat = new THREE.MeshBasicMaterial({ map: createEmojiTexture('☁️'), side: THREE.BackSide })
+  const skyMat = new THREE.MeshBasicMaterial({ map: createEmojiTexture('☁️', '#87ceeb'), side: THREE.BackSide })
   sky = new THREE.Mesh(skyGeo, skyMat)
   scene.add(sky)
 
@@ -98,8 +103,8 @@ function onKeyUp(e) {
   if (e.key === 'ArrowRight' || e.key === 'd') right = false
 }
 
-function spawnObstacle(dist) {
-  const radius = Math.random() * 2 + 0.5
+function spawnObstacle(dist, radius) {
+  radius = radius || 0.5 + Math.random() * 2
   const geo = new THREE.SphereGeometry(radius, 16, 16)
   const mat = new THREE.MeshStandardMaterial({ color: 0x00ff00 })
   const mesh = new THREE.Mesh(geo, mat)
@@ -119,7 +124,7 @@ function animate() {
   lastTime = now
 
   const maxSpeed = 5 + playerRadius
-  downSpeed = Math.min(downSpeed + 10 * delta, maxSpeed)
+  downSpeed = Math.min(downSpeed + 20 * delta, maxSpeed)
   if (left) sideSpeed -= 20 * delta
   if (right) sideSpeed += 20 * delta
   sideSpeed *= 0.95
@@ -134,14 +139,15 @@ function animate() {
   const y = player.userData.dist * Math.sin(slopeAngle)
   player.position.set(player.userData.x, y + playerRadius, z)
 
-  camera.position.set(player.userData.x, y + 5, z + 15)
+  camera.position.set(player.userData.x, y + 2, z + 10)
   camera.lookAt(player.position)
   ground.position.z = z
   sky.position.set(player.position.x, player.position.y, player.position.z)
 
   while (nextSpawnDist < player.userData.dist + 100) {
-    spawnObstacle(nextSpawnDist)
-    nextSpawnDist += 20 + Math.random() * 20
+    spawnObstacle(nextSpawnDist, playerRadius * (0.2 + Math.random() * 0.6))
+    spawnObstacle(nextSpawnDist, playerRadius * (0.6 + Math.random() * 2))
+    nextSpawnDist += 10 + Math.random() * 10
   }
 
   for (let i = obstacles.length - 1; i >= 0; i--) {
