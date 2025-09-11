@@ -18,5 +18,9 @@ export default [
     {
         name: 'survivor',
         thumbnail: '', // 暂无缩略图
+    },
+    {
+        name: 'rollingball',
+        thumbnail: '', // 暂无缩略图
     }
 ]
