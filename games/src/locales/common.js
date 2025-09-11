@@ -9,7 +9,8 @@ export default {
             tetris: 'テトリス',
             minesweeper: 'マインスイーパー',
             warehouse: '倉庫管理人の日常',
-            survivor: 'ヴァンパイア・サバイバー風'
+            survivor: 'ヴァンパイア・サバイバー風',
+            rollingball: '坂道ボール'
         }
     },
     en: {
@@ -22,7 +23,8 @@ export default {
             tetris: 'Tetris',
             minesweeper: 'Minesweeper',
             warehouse: 'Warehouse Manager\'s Daily Life',
-            survivor: 'Vampire Survivor-like'
+            survivor: 'Vampire Survivor-like',
+            rollingball: 'Rolling Ball'
         }
     },
     zh: {
@@ -35,7 +37,8 @@ export default {
             tetris: '俄罗斯方块',
             minesweeper: '扫雷',
             warehouse: '仓库管理员的日常',
-            survivor: '吸血鬼幸存者'
+            survivor: '吸血鬼幸存者',
+            rollingball: '下坡滚球'
         }
     }
 }
